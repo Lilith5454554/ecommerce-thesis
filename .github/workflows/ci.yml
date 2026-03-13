@@ -1,45 +1,86 @@
 name: Quality Gate CI
 
-# 什么时候触发这个自动化流程
+# 什么时候触发
 on:
   push:
-    branches: [ main, develop ]      # 当推送到 main 或 develop 分支时
+    branches: [ main, develop ]      # 推送到 main/develop 时触发
   pull_request:
-    branches: [ main ]                # 当创建针对 main 的 PR 时
+    branches: [ main ]                # 创建针对 main 的 PR 时触发
 
 # 要执行的任务
 jobs:
   test-user-service:
-    # 在什么环境运行
+    name: 测试用户服务
     runs-on: ubuntu-latest
 
-    # 具体的执行步骤
     steps:
-      # 第1步：把代码下载到运行环境
+      # 1. 拉取代码
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 第2步：安装 Python
+      # 2. 设置 Python 环境
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'      # 和你本地保持一致
 
-      # 第3步：安装依赖
-      - name: Install dependencies
+      # 3. 安装依赖（用户服务）
+      - name: Install user service dependencies
         run: |
           cd user_service
           pip install -r requirements.txt
           pip install pytest pytest-cov
 
-      # 第4步：运行测试
-      - name: Run tests
+      # 4. 运行测试（带覆盖率）
+      - name: Run user service tests
         run: |
           cd user_service
           pytest tests/ -v --cov=./ --cov-report=xml
 
-      # 第5步：上传测试报告（可选）
+      # 5. （可选）上传测试覆盖率报告
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
         with:
           files: ./user_service/coverage.xml
+          flags: user_service
+          name: user-service-coverage
+
+  # 商品服务测试（你可以按这个模板继续加）
+  test-product-service:
+    name: 测试商品服务
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Install dependencies
+        run: |
+          cd product_service
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+      - name: Run tests
+        run: |
+          cd product_service
+          pytest tests/ -v --cov=./ --cov-report=xml
+
+  # 订单服务测试
+  test-order-service:
+    name: 测试订单服务
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Install dependencies
+        run: |
+          cd order_service
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+      - name: Run tests
+        run: |
+          cd order_service
+          pytest tests/ -v --cov=./ --cov-report=xml
