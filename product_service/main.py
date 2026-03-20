@@ -1,166 +1,25 @@
-'''from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import Optional, List
-from datetime import datetime
-import os
-
-
-# ==================== 数据模型 ====================
-class ProductCreate(BaseModel):
-    name: str
-    description: Optional[str] = None
-    price: float
-    stock: int
-    category: Optional[str] = None
-
-
-class ProductUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    price: Optional[float] = None
-    stock: Optional[int] = None
-    category: Optional[str] = None
-
-
-class ProductResponse(BaseModel):
-    id: int
-    name: str
-    description: Optional[str] = None
-    price: float
-    stock: int
-    category: Optional[str] = None
-    created_at: datetime
-
-
-# ==================== 模拟数据库 ====================
-# 用字典模拟数据库，key是商品ID，value是商品数据
-products_db = {}
-current_id = 1
-
-# ==================== FastAPI 应用 ====================
-app = FastAPI(title="商品服务", description="电商平台商品管理服务")
-
-
-# ==================== 健康检查 ====================
-@app.get("/")
-async def root():
-    return {"service": "商品服务", "status": "running"}
-
-
-@app.get("/health")
-async def health():
-    return {"status": "healthy"}
-
-
-# ==================== 商品接口 ====================
-
-# 1. 创建商品
-@app.post("/products", response_model=ProductResponse, status_code=201)
-async def create_product(product: ProductCreate):
-    global current_id
-
-    new_product = {
-        "id": current_id,
-        "name": product.name,
-        "description": product.description,
-        "price": product.price,
-        "stock": product.stock,
-        "category": product.category,
-        "created_at": datetime.now()
-    }
-
-    products_db[current_id] = new_product
-    current_id += 1
-
-    return new_product
-
-
-# 2. 获取所有商品
-@app.get("/products", response_model=List[ProductResponse])
-async def get_products(skip: int = 0, limit: int = 100):
-    all_products = list(products_db.values())
-    return all_products[skip:skip + limit]
-
-
-# 3. 获取单个商品
-@app.get("/products/{product_id}", response_model=ProductResponse)
-async def get_product(product_id: int):
-    product = products_db.get(product_id)
-    if product is None:
-        raise HTTPException(status_code=404, detail="商品不存在")
-    return product
-
-
-# 4. 更新商品
-@app.put("/products/{product_id}", response_model=ProductResponse)
-async def update_product(product_id: int, product: ProductUpdate):
-    existing = products_db.get(product_id)
-    if existing is None:
-        raise HTTPException(status_code=404, detail="商品不存在")
-
-    # 只更新提供的字段
-    update_data = product.dict(exclude_unset=True)
-    for key, value in update_data.items():
-        if value is not None:
-            existing[key] = value
-
-    products_db[product_id] = existing
-    return existing
-
-
-# 5. 删除商品
-@app.delete("/products/{product_id}", status_code=204)
-async def delete_product(product_id: int):
-    if product_id not in products_db:
-        raise HTTPException(status_code=404, detail="商品不存在")
-
-    del products_db[product_id]
-    return None
-
-
-# 6. 检查库存
-@app.get("/products/{product_id}/stock")
-async def check_stock(product_id: int):
-    product = products_db.get(product_id)
-    if product is None:
-        raise HTTPException(status_code=404, detail="商品不存在")
-    return {"product_id": product_id, "stock": product["stock"]}
-
-
-# 7. 扣减库存（下单时调用）
-@app.post("/products/{product_id}/stock/decrease")
-async def decrease_stock(product_id: int, quantity: int):
-    product = products_db.get(product_id)
-    if product is None:
-        raise HTTPException(status_code=404, detail="商品不存在")
-
-    if product["stock"] < quantity:
-        raise HTTPException(status_code=400, detail="库存不足")
-
-    product["stock"] -= quantity
-    return {"product_id": product_id, "remaining_stock": product["stock"]}'''
-
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import Response
+# product_service/main.py
+from fastapi import FastAPI, HTTPException, Request, Response, Depends, status
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
 import os
 import time
+import uuid
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, REGISTRY
 import psutil
-import random
+from sqlalchemy.orm import Session
+from sqlalchemy import func
 
-# ==================== Prometheus 监控指标 ====================
+from models import Product, get_db, init_db, SessionLocal
 
-# 请求计数：记录每个端点的请求次数和状态码
+# ==================== Prometheus监控指标 ====================
 REQUEST_COUNT = Counter(
     'product_service_requests_total',
     'Total number of requests to product service',
     ['method', 'endpoint', 'status_code']
 )
 
-# 请求延迟：记录每个端点的响应时间
 REQUEST_LATENCY = Histogram(
     'product_service_request_duration_seconds',
     'Request duration in seconds',
@@ -168,98 +27,53 @@ REQUEST_LATENCY = Histogram(
     buckets=(0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10)
 )
 
-# 业务指标：商品总数
 PRODUCT_COUNT = Gauge(
     'product_service_product_count',
     'Total number of products in database'
 )
 
-# 业务指标：库存总量
 TOTAL_STOCK = Gauge(
     'product_service_total_stock',
     'Total stock of all products'
 )
 
-# 业务指标：商品分类数量
 CATEGORY_COUNT = Gauge(
     'product_service_category_count',
     'Number of distinct product categories'
 )
 
-# 系统指标：内存使用
 MEMORY_USAGE = Gauge(
     'product_service_memory_usage_bytes',
     'Memory usage in bytes'
 )
 
-# 系统指标：CPU使用率
 CPU_USAGE = Gauge(
     'product_service_cpu_usage_percent',
     'CPU usage percentage'
 )
 
-
-# ==================== 数据模型 ====================
-class ProductCreate(BaseModel):
-    name: str
-    description: Optional[str] = None
-    price: float
-    stock: int
-    category: Optional[str] = None
-
-
-class ProductUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    price: Optional[float] = None
-    stock: Optional[int] = None
-    category: Optional[str] = None
-
-
-class ProductResponse(BaseModel):
-    id: int
-    name: str
-    description: Optional[str] = None
-    price: float
-    stock: int
-    category: Optional[str] = None
-    created_at: datetime
-
-
-# ==================== 模拟数据库 ====================
-products_db = {}
-current_id = 1
-
-# ==================== FastAPI 应用 ====================
+# ==================== FastAPI应用 ====================
 app = FastAPI(title="商品服务", description="电商平台商品管理服务")
 
 
-# ==================== 监控中间件 ====================
+# ==================== 中间件 ====================
 @app.middleware("http")
 async def monitor_requests(request: Request, call_next):
-    """监控所有请求的中间件"""
-    # 记录开始时间
     start_time = time.time()
 
-    # 处理请求
     try:
         response = await call_next(request)
         status_code = response.status_code
     except Exception as e:
-        # 记录异常
         status_code = 500
-        raise e
+        raise
     finally:
-        # 计算耗时
         duration = time.time() - start_time
-
-        # 记录请求指标
         REQUEST_COUNT.labels(
             method=request.method,
             endpoint=request.url.path,
             status_code=status_code
         ).inc()
-
         REQUEST_LATENCY.labels(
             method=request.method,
             endpoint=request.url.path
@@ -268,42 +82,76 @@ async def monitor_requests(request: Request, call_next):
     return response
 
 
-# ==================== 后台任务：更新系统指标 ====================
+# ==================== 后台任务 ====================
 @app.on_event("startup")
 async def startup_event():
-    """启动时执行的任务"""
+    init_db()
     import asyncio
     asyncio.create_task(update_system_metrics())
 
 
 async def update_system_metrics():
-    """定期更新系统指标的后台任务"""
     import asyncio
     while True:
-        # 更新业务指标
-        PRODUCT_COUNT.set(len(products_db))
+        db = SessionLocal()
+        try:
+            product_count = db.query(Product).count()
+            PRODUCT_COUNT.set(product_count)
 
-        # 计算总库存
-        total_stock = sum(p["stock"] for p in products_db.values())
-        TOTAL_STOCK.set(total_stock)
+            total_stock = db.query(func.sum(Product.stock)).scalar() or 0
+            TOTAL_STOCK.set(total_stock)
 
-        # 计算分类数量
-        categories = set(p.get("category") for p in products_db.values() if p.get("category"))
-        CATEGORY_COUNT.set(len(categories))
+            categories = db.query(Product.category).distinct().count()
+            CATEGORY_COUNT.set(categories)
+        finally:
+            db.close()
 
-        # 更新系统指标
         process = psutil.Process()
         MEMORY_USAGE.set(process.memory_info().rss)
         CPU_USAGE.set(process.cpu_percent())
 
-        # 每15秒更新一次
         await asyncio.sleep(15)
+
+
+# ==================== 数据模型 ====================
+class ProductCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    price: float
+    stock: int = 0
+    category: Optional[str] = None
+
+
+class ProductUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    price: Optional[float] = None
+    stock: Optional[int] = None
+    category: Optional[str] = None
+
+
+class ProductResponse(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    price: float
+    stock: int
+    category: Optional[str] = None
+    created_at: datetime
+
+
+# ==================== 关键修正：库存操作Pydantic模型 ====================
+class ReserveRequest(BaseModel):
+    quantity: int
+
+
+class ReleaseRequest(BaseModel):
+    quantity: int
 
 
 # ==================== 监控端点 ====================
 @app.get("/metrics")
 async def get_metrics():
-    """Prometheus 监控指标端点"""
     return Response(content=generate_latest(REGISTRY), media_type="text/plain")
 
 
@@ -313,173 +161,200 @@ async def root():
     return {
         "service": "商品服务",
         "status": "running",
-        "version": "1.0.0",
-        "metrics": "/metrics - Prometheus监控指标"
+        "version": "1.0.0"
     }
 
 
 @app.get("/health")
-async def health():
-    """详细健康检查，包含各个组件的状态"""
-    # 检查数据库（模拟）
-    db_status = "healthy" if products_db is not None else "unhealthy"
+async def health(db: Session = Depends(get_db)):
+    try:
+        db.execute("SELECT 1")
+        db_status = "healthy"
+    except Exception as e:
+        db_status = f"unhealthy: {str(e)}"
 
-    # 检查内存使用
-    process = psutil.Process()
-    memory_mb = process.memory_info().rss / 1024 / 1024
+    product_count = db.query(Product).count()
 
     return {
-        "status": "healthy",
+        "status": "healthy" if db_status == "healthy" else "unhealthy",
         "service": "product_service",
-        "timestamp": datetime.now().isoformat(),
-        "checks": {
-            "database": db_status,
-            "memory": f"{memory_mb:.2f} MB",
-            "products_count": len(products_db)
-        }
+        "database": db_status,
+        "products_count": product_count
     }
 
 
-# ==================== 商品接口 ====================
-
-# 1. 创建商品
+# ==================== 商品CRUD ====================
 @app.post("/products", response_model=ProductResponse, status_code=201)
-async def create_product(product: ProductCreate):
-    global current_id
+async def create_product(product: ProductCreate, db: Session = Depends(get_db)):
+    product_id = str(uuid.uuid4())
 
-    new_product = {
-        "id": current_id,
+    db_product = Product(
+        id=product_id,
+        name=product.name,
+        description=product.description,
+        price=product.price,
+        stock=product.stock,
+        category=product.category
+    )
+    db.add(db_product)
+    db.commit()
+    db.refresh(db_product)
+
+    return {
+        "id": db_product.id,
+        "name": db_product.name,
+        "description": db_product.description,
+        "price": db_product.price,
+        "stock": db_product.stock,
+        "category": db_product.category,
+        "created_at": db_product.created_at
+    }
+
+
+@app.get("/products", response_model=List[ProductResponse])
+async def get_products(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    products = db.query(Product).offset(skip).limit(limit).all()
+    return [{
+        "id": p.id,
+        "name": p.name,
+        "description": p.description,
+        "price": p.price,
+        "stock": p.stock,
+        "category": p.category,
+        "created_at": p.created_at
+    } for p in products]
+
+
+@app.get("/products/{product_id}", response_model=ProductResponse)
+async def get_product(product_id: str, db: Session = Depends(get_db)):
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="商品不存在")
+    return {
+        "id": product.id,
         "name": product.name,
         "description": product.description,
         "price": product.price,
         "stock": product.stock,
         "category": product.category,
-        "created_at": datetime.now()
+        "created_at": product.created_at
     }
 
-    products_db[current_id] = new_product
-    current_id += 1
 
-    # 手动触发指标更新（可选，但后台任务会自动更新）
-    PRODUCT_COUNT.inc()
-
-    return new_product
-
-
-# 2. 获取所有商品
-@app.get("/products", response_model=List[ProductResponse])
-async def get_products(skip: int = 0, limit: int = 100):
-    all_products = list(products_db.values())
-    return all_products[skip:skip + limit]
-
-
-# 3. 获取单个商品
-@app.get("/products/{product_id}", response_model=ProductResponse)
-async def get_product(product_id: int):
-    product = products_db.get(product_id)
-    if product is None:
-        raise HTTPException(status_code=404, detail="商品不存在")
-    return product
-
-
-# 4. 更新商品
 @app.put("/products/{product_id}", response_model=ProductResponse)
-async def update_product(product_id: int, product: ProductUpdate):
-    existing = products_db.get(product_id)
-    if existing is None:
+async def update_product(product_id: str, product: ProductUpdate, db: Session = Depends(get_db)):
+    db_product = db.query(Product).filter(Product.id == product_id).first()
+    if not db_product:
         raise HTTPException(status_code=404, detail="商品不存在")
 
-    # 只更新提供的字段
     update_data = product.dict(exclude_unset=True)
     for key, value in update_data.items():
-        if value is not None:
-            existing[key] = value
+        setattr(db_product, key, value)
 
-    products_db[product_id] = existing
-    return existing
+    db.commit()
+    db.refresh(db_product)
+    return {
+        "id": db_product.id,
+        "name": db_product.name,
+        "description": db_product.description,
+        "price": db_product.price,
+        "stock": db_product.stock,
+        "category": db_product.category,
+        "created_at": db_product.created_at
+    }
 
 
-# 5. 删除商品
 @app.delete("/products/{product_id}", status_code=204)
-async def delete_product(product_id: int):
-    if product_id not in products_db:
+async def delete_product(product_id: str, db: Session = Depends(get_db)):
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
         raise HTTPException(status_code=404, detail="商品不存在")
 
-    del products_db[product_id]
-    PRODUCT_COUNT.dec()  # 商品总数减1
+    db.delete(product)
+    db.commit()
     return None
 
 
-# 6. 检查库存
+# ==================== 库存管理（关键修正：使用Pydantic模型）====================
+
 @app.get("/products/{product_id}/stock")
-async def check_stock(product_id: int):
-    product = products_db.get(product_id)
-    if product is None:
+async def check_stock(product_id: str, db: Session = Depends(get_db)):
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
         raise HTTPException(status_code=404, detail="商品不存在")
-    return {"product_id": product_id, "stock": product["stock"]}
+    return {"product_id": product_id, "stock": product.stock}
 
 
-# 7. 扣减库存（下单时调用）
+# 关键修正：使用 ReserveRequest Pydantic模型
+@app.post("/products/{product_id}/stock/reserve")
+async def reserve_stock(
+        product_id: str,
+        req: ReserveRequest,  # 修正：使用Pydantic模型
+        db: Session = Depends(get_db)
+):
+    """
+    预留库存：直接扣减库存，用于订单创建
+    如果订单后续失败，需要调用 /stock/release 释放
+    """
+    quantity = req.quantity  # 直接访问属性
+
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    if product.stock < quantity:
+        return {
+            "success": False,
+            "message": f"Insufficient stock: available {product.stock}, requested {quantity}"
+        }
+
+    product.stock -= quantity
+    db.commit()
+
+    return {
+        "success": True,
+        "reserved": quantity,
+        "remaining_stock": product.stock,
+        "price": product.price
+    }
+
+
+# 关键修正：使用 ReleaseRequest Pydantic模型
+@app.post("/products/{product_id}/stock/release")
+async def release_stock(
+        product_id: str,
+        req: ReleaseRequest,  # 修正：使用Pydantic模型
+        db: Session = Depends(get_db)
+):
+    """
+    释放库存：将预留的库存加回来（订单取消或失败时调用）
+    """
+    quantity = req.quantity  # 直接访问属性
+
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    product.stock += quantity
+    db.commit()
+
+    return {
+        "success": True,
+        "released": quantity,
+        "current_stock": product.stock
+    }
+
+
 @app.post("/products/{product_id}/stock/decrease")
-async def decrease_stock(product_id: int, quantity: int):
-    product = products_db.get(product_id)
-    if product is None:
+async def decrease_stock(product_id: str, quantity: int, db: Session = Depends(get_db)):
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
         raise HTTPException(status_code=404, detail="商品不存在")
 
-    if product["stock"] < quantity:
+    if product.stock < quantity:
         raise HTTPException(status_code=400, detail="库存不足")
 
-    product["stock"] -= quantity
-    # 库存变化会自动被后台指标更新任务捕获
-    return {"product_id": product_id, "remaining_stock": product["stock"]}
+    product.stock -= quantity
+    db.commit()
 
-
-# 8. 批量创建商品（用于测试）
-@app.post("/products/batch", status_code=201)
-async def create_batch_products(count: int = 10):
-    """批量创建商品，用于测试监控"""
-    global current_id
-    created = []
-
-    categories = ["电子产品", "服装", "食品", "图书", "家居"]
-
-    for i in range(count):
-        new_product = {
-            "id": current_id,
-            "name": f"测试商品{current_id}",
-            "description": f"这是第{current_id}个测试商品",
-            "price": round(random.uniform(10, 1000), 2),
-            "stock": random.randint(0, 200),
-            "category": random.choice(categories),
-            "created_at": datetime.now()
-        }
-        products_db[current_id] = new_product
-        created.append(new_product)
-        current_id += 1
-
-    PRODUCT_COUNT.inc(count)
-    return {"message": f"成功创建{count}个商品", "products": created}
-
-
-# 9. 模拟慢查询（用于测试监控）
-@app.get("/products/slow-query")
-async def slow_query(delay: float = 2.0):
-    """模拟慢查询，测试监控告警"""
-    import asyncio
-    await asyncio.sleep(delay)
-    return {"message": f"慢查询完成，延迟{delay}秒"}
-
-
-# 10. 模拟错误（用于测试监控）
-@app.get("/products/error-test")
-async def error_test(error_type: str = "500"):
-    """模拟各种错误，测试监控"""
-    if error_type == "404":
-        raise HTTPException(status_code=404, detail="模拟的404错误")
-    elif error_type == "400":
-        raise HTTPException(status_code=400, detail="模拟的400错误")
-    elif error_type == "500":
-        raise HTTPException(status_code=500, detail="模拟的500错误")
-    else:
-        return {"message": "没有错误"}
-
+    return {"product_id": product_id, "remaining_stock": product.stock}

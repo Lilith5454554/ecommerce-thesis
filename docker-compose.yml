@@ -1,7 +1,8 @@
+# docker-compose.yml
 version: '3.8'
 
 services:
-  # ==================== 数据库 ====================
+  # 数据库
   postgres:
     image: postgres:15
     container_name: ecommerce-postgres
@@ -16,12 +17,12 @@ services:
     networks:
       - ecommerce-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user"]
+      test: ["CMD-SHELL", "pg_isready -U user -d ecommerce"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # ==================== Redis缓存 ====================
+  # Redis缓存
   redis:
     image: redis:7-alpine
     container_name: ecommerce-redis
@@ -35,7 +36,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # ==================== 微服务 ====================
+  # 用户服务
   user-service:
     build: ./user_service
     container_name: user-service
@@ -43,11 +44,9 @@ services:
       - "8001:8000"
     environment:
       - DATABASE_URL=postgresql://user:password@postgres:5432/ecommerce
-      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-ecommerce-dev-secret-key}  # 统一JWT密钥
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     networks:
       - ecommerce-network
@@ -55,6 +54,7 @@ services:
       - ./user_service:/app
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
+  # 商品服务
   product-service:
     build: ./product_service
     container_name: product-service
@@ -62,11 +62,8 @@ services:
       - "8002:8000"
     environment:
       - DATABASE_URL=postgresql://user:password@postgres:5432/ecommerce
-      - REDIS_URL=redis://redis:6379/0
     depends_on:
       postgres:
-        condition: service_healthy
-      redis:
         condition: service_healthy
     networks:
       - ecommerce-network
@@ -74,6 +71,7 @@ services:
       - ./product_service:/app
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
+  # 订单服务
   order-service:
     build: ./order_service
     container_name: order-service
@@ -81,16 +79,10 @@ services:
       - "8003:8000"
     environment:
       - DATABASE_URL=postgresql://user:password@postgres:5432/ecommerce
-      - REDIS_URL=redis://redis:6379/0
-      - USER_SERVICE_URL=http://user-service:8000
       - PRODUCT_SERVICE_URL=http://product-service:8000
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
-      user-service:
-        condition: service_started
       product-service:
         condition: service_started
     networks:
@@ -99,6 +91,7 @@ services:
       - ./order_service:/app
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
+  # API网关
   api-gateway:
     build: ./api_gateway
     container_name: api-gateway
@@ -108,6 +101,7 @@ services:
       - USER_SERVICE_URL=http://user-service:8000
       - PRODUCT_SERVICE_URL=http://product-service:8000
       - ORDER_SERVICE_URL=http://order-service:8000
+      - SECRET_KEY=${SECRET_KEY:-ecommerce-dev-secret-key}  # 与用户服务相同
     depends_on:
       - user-service
       - product-service
@@ -118,7 +112,7 @@ services:
       - ./api_gateway:/app
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
-  # ==================== 监控 ====================
+  # Prometheus监控
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
@@ -132,11 +126,8 @@ services:
       - '--storage.tsdb.path=/prometheus'
     networks:
       - ecommerce-network
-    depends_on:
-      - user-service
-      - product-service
-      - order-service
 
+  # Grafana可视化
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
@@ -144,20 +135,19 @@ services:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_INSTALL_PLUGINS=grafana-piechart-panel
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana-dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
     networks:
       - ecommerce-network
     depends_on:
       - prometheus
 
-# ==================== 网络 ====================
 networks:
   ecommerce-network:
     driver: bridge
 
-# ==================== 数据卷 ====================
 volumes:
   postgres_data:
   prometheus_data:
