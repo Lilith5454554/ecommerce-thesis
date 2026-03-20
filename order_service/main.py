@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+'''from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
@@ -216,5 +216,125 @@ async def cancel_order(order_id: int):
         raise HTTPException(status_code=400, detail="已发货或已完成订单不能取消")
 
     order["status"] = "cancelled"
-    return {"order_id": order_id, "status": "cancelled"}
+    return {"order_id": order_id, "status": "cancelled"}'''
 
+from fastapi import FastAPI, HTTPException, Response
+from pydantic import BaseModel
+from typing import Optional, List
+from datetime import datetime
+import time
+import logging
+from prometheus_client import Counter, Histogram, generate_latest, REGISTRY
+import os
+
+# 日志配置
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# 创建应用 - 正确的写法，没有 static_files 参数
+app = FastAPI(title="订单服务", description="电商平台订单管理服务")
+
+# 监控指标
+REQUEST_COUNT = Counter('http_requests_total', 'Total requests', ['method', 'endpoint', 'status'])
+REQUEST_LATENCY = Histogram('http_request_duration_seconds', 'Request latency', ['method', 'endpoint'])
+
+
+# 中间件
+@app.middleware("http")
+async def monitor_requests(request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    duration = time.time() - start_time
+
+    REQUEST_COUNT.labels(
+        method=request.method,
+        endpoint=request.url.path,
+        status=response.status_code
+    ).inc()
+
+    REQUEST_LATENCY.labels(
+        method=request.method,
+        endpoint=request.url.path
+    ).observe(duration)
+
+    return response
+
+
+# Metrics 端点
+@app.get("/metrics")
+async def get_metrics():
+    return Response(content=generate_latest(REGISTRY), media_type="text/plain")
+
+
+# 数据模型
+class OrderItem(BaseModel):
+    product_id: int
+    product_name: str
+    quantity: int
+    price: float
+
+
+class OrderCreate(BaseModel):
+    user_id: int
+    items: List[OrderItem]
+    shipping_address: str
+
+
+class OrderResponse(BaseModel):
+    id: int
+    user_id: int
+    total_amount: float
+    status: str
+    shipping_address: str
+    items: List[OrderItem]
+    created_at: datetime
+
+
+# 模拟数据库
+orders_db = {}
+current_order_id = 1
+
+
+# API 端点
+@app.get("/")
+async def root():
+    return {"service": "订单服务", "status": "running"}
+
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}
+
+
+@app.post("/orders", response_model=OrderResponse, status_code=201)
+async def create_order(order: OrderCreate):
+    global current_order_id
+    total_amount = sum(item.price * item.quantity for item in order.items)
+
+    new_order = {
+        "id": current_order_id,
+        "user_id": order.user_id,
+        "total_amount": total_amount,
+        "status": "pending",
+        "shipping_address": order.shipping_address,
+        "items": [item.dict() for item in order.items],
+        "created_at": datetime.now()
+    }
+
+    orders_db[current_order_id] = new_order
+    current_order_id += 1
+    return new_order
+
+
+@app.get("/orders", response_model=List[OrderResponse])
+async def get_orders(skip: int = 0, limit: int = 100):
+    orders = list(orders_db.values())
+    return orders[skip:skip + limit]
+
+
+@app.get("/orders/{order_id}", response_model=OrderResponse)
+async def get_order(order_id: int):
+    order = orders_db.get(order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="订单不存在")
+    return order
