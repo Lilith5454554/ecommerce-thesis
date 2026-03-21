@@ -6,8 +6,29 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
+# 1. 先导入 models 并创建数据库表
+from user_service.models import init_db, SessionLocal
+
+# 2. 创建数据库表（关键步骤！）
+init_db()
+print("✓ Database tables created for testing")
+
 from fastapi.testclient import TestClient
 from user_service.main import app
+
+def setup_function():
+    """每个测试前清空表数据，保证测试隔离"""
+    db = SessionLocal()
+    try:
+        # PostgreSQL 语法：清空并重置自增ID
+        db.execute("TRUNCATE TABLE users RESTART IDENTITY CASCADE")
+        db.commit()
+        print("✓ Test data cleared")
+    except Exception as e:
+        db.rollback()
+        print(f"Error clearing table: {e}")
+    finally:
+        db.close()
 
 client = TestClient(app)
 

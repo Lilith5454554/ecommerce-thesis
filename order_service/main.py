@@ -22,7 +22,7 @@ from order_service.models import (
     init_db,
     SessionLocal  # 关键：供定时任务使用
 )
-from saga import OrderSaga
+from order_service.saga import OrderSaga
 
 # ==================== 配置 ====================
 logging.basicConfig(level=logging.INFO)
