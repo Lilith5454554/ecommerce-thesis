@@ -11,7 +11,7 @@ import os
 from sqlalchemy.orm import Session
 
 # ==================== 关键：统一从models导入所有数据库相关 ====================
-from models import User, get_db, init_db, SessionLocal
+from user_service.models import User, get_db, init_db, SessionLocal
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
