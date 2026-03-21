@@ -11,7 +11,9 @@ import psutil
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from models import Product, get_db, init_db, SessionLocal
+
+from product_service.models import Product, get_db, init_db, SessionLocal
+
 
 # ==================== Prometheus监控指标 ====================
 REQUEST_COUNT = Counter(

@@ -6,6 +6,7 @@ from typing import List, Optional
 import uuid
 import time
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, REGISTRY
+import prometheus_client
 import psutil
 import os
 from sqlalchemy.orm import Session
@@ -15,6 +16,20 @@ from user_service.models import User, get_db, init_db, SessionLocal
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
+
+# ==================== 修复 Prometheus 指标重复注册 ====================
+# 清除默认的 process collector，避免重复注册
+try:
+    REGISTRY.unregister(prometheus_client.ProcessCollector)
+except KeyError:
+    pass
+
+# 清除其他可能重复的 collector
+try:
+    REGISTRY.unregister(prometheus_client.PlatformCollector)
+except KeyError:
+    pass
+
 
 # ==================== Prometheus 监控指标（保持原有）====================
 REQUEST_COUNT = Counter(

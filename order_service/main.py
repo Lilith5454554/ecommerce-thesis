@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 # ==================== 关键修正：显式导入SessionLocal ====================
-from models import (
+from order_service.models import (
     Order,
     OrderItem,
     OrderStatus,
