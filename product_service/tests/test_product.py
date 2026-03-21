@@ -3,12 +3,12 @@ import os
 from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
-from product_service.models import init_db
+from product_service.main import app
+from product_service.models import init_db, SessionLocal, Product
 # 添加项目根目录到 Python 路径
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from product_service.main import app
 
 client = TestClient(app)
 
@@ -20,13 +20,16 @@ print("✓ Product service tables created")
 # ==================== 测试辅助函数 ====================
 def setup_function():
     """每个测试前重置数据库"""
-    # 注意：如果你的 main.py 中有全局变量，可以在这里重置
-    # 这里假设你的商品服务有 products_db 全局变量
-    import product_service.main
-    if hasattr(product_service.main, 'products_db'):
-        product_service.main.products_db.clear()
-    if hasattr(product_service.main, 'current_product_id'):
-        product_service.main.current_product_id = 1
+    db = SessionLocal()
+    try:
+        db.query(Product).delete()
+        db.commit()
+        print("✓ Test data cleared")
+    except Exception as e:
+        db.rollback()
+        print(f"Error clearing table: {e}")
+    finally:
+        db.close()
 
 
 # ==================== 基础接口测试 ====================
