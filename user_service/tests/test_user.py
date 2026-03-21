@@ -7,7 +7,7 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 # 1. 先导入 models 并创建数据库表
-from user_service.models import init_db, SessionLocal
+from user_service.models import init_db, SessionLocal,User
 
 # 2. 创建数据库表（关键步骤！）
 init_db()
@@ -20,8 +20,8 @@ def setup_function():
     """每个测试前清空表数据，保证测试隔离"""
     db = SessionLocal()
     try:
-        # PostgreSQL 语法：清空并重置自增ID
-        db.execute("TRUNCATE TABLE users RESTART IDENTITY CASCADE")
+        # 使用 SQLAlchemy 删除所有数据
+        db.query(User).delete()
         db.commit()
         print("✓ Test data cleared")
     except Exception as e:

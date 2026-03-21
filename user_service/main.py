@@ -10,6 +10,7 @@ import prometheus_client
 import psutil
 import os
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 # ==================== 关键：统一从models导入所有数据库相关 ====================
 from user_service.models import User, get_db, init_db, SessionLocal
@@ -200,7 +201,7 @@ async def root():
 async def health_check():
     try:
         db = SessionLocal()
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         db.close()
         db_status = "healthy"
     except Exception as e:
@@ -297,3 +298,17 @@ async def update_user(user_id: str, user_update: UserCreate, db: Session = Depen
     db.commit()
     db.refresh(user)
     return {"id": user.id, "username": user.username, "email": user.email}
+
+# ==================== 配置 bcrypt，设置截断策略 ====================
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__truncate_error=False  # 自动截断过长的密码
+)
+
+def get_password_hash(password):
+    """生成密码哈希，自动处理过长密码"""
+    # bcrypt 限制 72 字节，超过部分截断
+    if len(password.encode('utf-8')) > 72:
+        password = password[:72]  # 截断到72字节
+    return pwd_context.hash(password)

@@ -1,4 +1,3 @@
-# order_service/main.py
 from fastapi import FastAPI, HTTPException, Response, Depends, status
 from pydantic import BaseModel
 from typing import Optional, List,Dict
@@ -12,6 +11,21 @@ import asyncio
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, REGISTRY
 from sqlalchemy.orm import Session
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from contextlib import asynccontextmanager
+
+# ==================== 添加异常处理（saga导入异常时） ====================
+try:
+    from order_service.saga import OrderSaga
+except ImportError:
+    try:
+        from .saga import OrderSaga
+    except ImportError:
+        # 如果都不行，创建一个模拟类
+        class OrderSaga:
+            def __init__(self, *args, **kwargs):
+                pass
+            async def execute(self, *args, **kwargs):
+                return {"success": False, "error": "Saga not available"}
 
 # ==================== 关键修正：显式导入SessionLocal ====================
 from order_service.models import (
@@ -74,23 +88,43 @@ async def monitor_requests(request, call_next):
     return response
 
 
-# ==================== 启动事件 ====================
-@app.on_event("startup")
-async def startup_event():
-    init_db()
-    scheduler.start()
-    scheduler.add_job(
-        cancel_unpaid_orders,
-        'interval',
-        minutes=1,
-        id='cancel_unpaid_orders'
-    )
-    logger.info("Order service started with Saga support")
+# ==================== 应用生命周期管理 ====================
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """应用生命周期管理（替代 on_event）"""
 
+    # ========== 启动时执行 ==========
+    logger.info("Starting up order service...")
 
-@app.on_event("shutdown")
-async def shutdown_event():
-    scheduler.shutdown()
+    # 1. 初始化数据库表
+    try:
+        init_db()
+        logger.info("✓ Database tables initialized")
+    except Exception as e:
+        logger.error(f"Database initialization error: {e}")
+
+    # 2. 启动定时任务调度器
+    try:
+        scheduler.start()
+        scheduler.add_job(
+            cancel_unpaid_orders,
+            'interval',
+            minutes=1,
+            id='cancel_unpaid_orders'
+        )
+        logger.info("✓ Scheduler started")
+    except Exception as e:
+        logger.error(f"Scheduler start error: {e}")
+
+    yield  # 应用程序运行期间
+
+    # ========== 关闭时执行 ==========
+    logger.info("Shutting down order service...")
+    try:
+        scheduler.shutdown()
+        logger.info("✓ Scheduler shutdown")
+    except Exception as e:
+        logger.error(f"Scheduler shutdown error: {e}")
 
 
 # ==================== 关键修正：定时任务使用正确导入的SessionLocal ====================

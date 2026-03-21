@@ -1,10 +1,9 @@
-# product_service/tests/test_product.py
 import sys
 import os
 from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
-
+from product_service.models import init_db
 # 添加项目根目录到 Python 路径
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
@@ -12,6 +11,10 @@ sys.path.insert(0, str(project_root))
 from product_service.main import app
 
 client = TestClient(app)
+
+# ==================== 创建数据库表 ====================
+init_db()
+print("✓ Product service tables created")
 
 
 # ==================== 测试辅助函数 ====================
