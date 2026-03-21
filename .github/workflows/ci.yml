@@ -91,6 +91,7 @@ jobs:
           cd product_service
           pip install -r requirements.txt
           pip install psycopg2-binary
+          pip install pytest pytest-cov
 
       - name: Wait for PostgreSQL
         run: |
@@ -142,6 +143,7 @@ jobs:
           cd order_service
           pip install -r requirements.txt
           pip install psycopg2-binary
+          pip install pytest pytest-cov
 
       - name: Wait for PostgreSQL
         run: |

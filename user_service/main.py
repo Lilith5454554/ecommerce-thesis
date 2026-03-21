@@ -56,12 +56,12 @@ TOTAL_USERS = Gauge(
 )
 
 PROCESS_MEMORY = Gauge(
-    'process_memory_bytes',
+    'user_service_process_memory_bytes',
     'Process memory usage in bytes'
 )
 
 PROCESS_CPU = Gauge(
-    'process_cpu_seconds_total',
+    'user_service_process_cpu_seconds_total',
     'Process CPU time in seconds'
 )
 
