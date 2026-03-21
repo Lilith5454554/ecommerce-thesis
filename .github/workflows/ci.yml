@@ -1,86 +1,165 @@
 name: Quality Gate CI
 
-# 什么时候触发
 on:
   push:
-    branches: [ main, develop ]      # 推送到 main/develop 时触发
+    branches: [ main, develop ]
   pull_request:
-    branches: [ main ]                # 创建针对 main 的 PR 时触发
+    branches: [ main ]
 
-# 要执行的任务
 jobs:
   test-user-service:
-    name: 测试用户服务
     runs-on: ubuntu-latest
 
-    steps:
-      # 1. 拉取代码
-      - name: Checkout code
-        uses: actions/checkout@v3
+    # ✅ 添加 PostgreSQL 服务
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: ecommerce
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
-      # 2. 设置 Python 环境
+    steps:
+      - uses: actions/checkout@v3
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'      # 和你本地保持一致
+          python-version: '3.9'
 
-      # 3. 安装依赖（用户服务）
-      - name: Install user service dependencies
+      - name: Install dependencies
         run: |
           cd user_service
           pip install -r requirements.txt
-          pip install pytest pytest-cov
+          pip install psycopg2-binary
 
-      # 4. 运行测试（带覆盖率）
-      - name: Run user service tests
+      - name: Wait for PostgreSQL
+        run: |
+          until pg_isready -h localhost -p 5432 -U user; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+
+      - name: Run tests with coverage
         run: |
           cd user_service
+          # 设置测试数据库环境变量
+          export DATABASE_URL=postgresql://user:password@localhost:5432/ecommerce
           pytest tests/ -v --cov=./ --cov-report=xml
 
-      # 5. （可选）上传测试覆盖率报告
-      - name: Upload coverage to Codecov
+      - name: Upload coverage
         uses: codecov/codecov-action@v3
         with:
           files: ./user_service/coverage.xml
           flags: user_service
-          name: user-service-coverage
 
-  # 商品服务测试（你可以按这个模板继续加）
   test-product-service:
-    name: 测试商品服务
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: ecommerce
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v3
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
+
       - name: Install dependencies
         run: |
           cd product_service
           pip install -r requirements.txt
-          pip install pytest pytest-cov
-      - name: Run tests
+          pip install psycopg2-binary
+
+      - name: Wait for PostgreSQL
+        run: |
+          until pg_isready -h localhost -p 5432 -U user; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+
+      - name: Run tests with coverage
         run: |
           cd product_service
+          export DATABASE_URL=postgresql://user:password@localhost:5432/ecommerce
           pytest tests/ -v --cov=./ --cov-report=xml
 
-  # 订单服务测试
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./product_service/coverage.xml
+          flags: product_service
+
   test-order-service:
-    name: 测试订单服务
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: user
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: ecommerce
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v3
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
+
       - name: Install dependencies
         run: |
           cd order_service
           pip install -r requirements.txt
-          pip install pytest pytest-cov
-      - name: Run tests
+          pip install psycopg2-binary
+
+      - name: Wait for PostgreSQL
+        run: |
+          until pg_isready -h localhost -p 5432 -U user; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+
+      - name: Run tests with coverage
         run: |
           cd order_service
+          export DATABASE_URL=postgresql://user:password@localhost:5432/ecommerce
           pytest tests/ -v --cov=./ --cov-report=xml
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./order_service/coverage.xml
+          flags: order_service
+
+
