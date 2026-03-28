@@ -62,4 +62,6 @@ def get_db():
 
 
 def init_db():
+    """创建所有数据库表"""
     Base.metadata.create_all(bind=engine)
+    print("Database tables created!")  # 添加调试输出

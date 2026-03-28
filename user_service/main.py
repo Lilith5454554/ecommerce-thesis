@@ -173,8 +173,9 @@ def verify_password(plain_password, hashed_password):
 def get_password_hash(password):
     """生成密码哈希，自动处理过长密码"""
     # bcrypt 限制 72 字节，超过部分截断
-    if len(password.encode('utf-8')) > 72:
-        password = password[:72]
+    password_bytes = password.encode('utf-8')
+    if len(password_bytes) > 72:
+        password = password_bytes[:72].decode('utf-8', errors='ignore')
     return pwd_context.hash(password)
 
 
@@ -288,7 +289,10 @@ async def delete_user(user_id: str, db: Session = Depends(get_db)):
     db.delete(user)
     db.commit()
     # 确保返回包含 id 字段
-    return {"id": user_id, "message": "User deleted successfully"}
+    return {
+        "id": user_id,
+        "message": "User deleted successfully"
+    }
 
 
 @app.put("/users/{user_id}", response_model=UserResponse)

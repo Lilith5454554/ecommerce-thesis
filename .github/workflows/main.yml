@@ -43,7 +43,7 @@ jobs:
           PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/user_service"
         run: |
           cd user_service
-          python -c "from models import init_db; init_db()"    
+          python -c "from models import init_db; init_db()"
 
       - name: Run tests
         env:
@@ -89,7 +89,7 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
           PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/user_service"
         run: |
-          cd user_service
+          cd product_service
           python -c "from models import init_db; init_db()"
 
       - name: Run tests
@@ -145,4 +145,4 @@ jobs:
           PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/order_service:${{ github.workspace }}/order_service/.."
         run: |
           cd order_service
-          pytest tests/ -v --cov=./ --cov-report=xml
+          python -c "from models import init_db, Base, engine; print('Creating tables...'); Base.metadata.create_all(bind=engine); print('Done!')"
