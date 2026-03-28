@@ -16,6 +16,12 @@ from user_service.models import User, get_db, init_db, SessionLocal
 from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
+# ==================== 配置 bcrypt，设置截断策略（只定义一次，移到文件顶部）====================
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__truncate_error=False  # 自动截断过长的密码
+)
 
 # ==================== 修复 Prometheus 指标重复注册 ====================
 # 清除默认的 process collector，避免重复注册
@@ -70,12 +76,6 @@ SECRET_KEY = os.getenv("SECRET_KEY", "ecommerce-dev-secret-key")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-# ==================== 配置 bcrypt，设置截断策略（只定义一次，移到文件顶部）====================
-pwd_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto",
-    bcrypt__truncate_error=False  # 自动截断过长的密码
-)
 
 # ==================== FastAPI应用 ====================
 app = FastAPI(title="User Service", description="用户服务")
