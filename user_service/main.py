@@ -1,4 +1,3 @@
-# user_service/main.py
 from fastapi import FastAPI, HTTPException, Response, Depends, status
 from fastapi.responses import Response
 from pydantic import BaseModel
@@ -71,7 +70,12 @@ SECRET_KEY = os.getenv("SECRET_KEY", "ecommerce-dev-secret-key")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# ==================== 配置 bcrypt，设置截断策略（只定义一次，移到文件顶部）====================
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__truncate_error=False  # 自动截断过长的密码
+)
 
 # ==================== FastAPI应用 ====================
 app = FastAPI(title="User Service", description="用户服务")
@@ -167,6 +171,8 @@ def verify_password(plain_password, hashed_password):
 
 
 def get_password_hash(password):
+    """生成密码哈希，自动处理过长密码"""
+    # bcrypt 限制 72 字节，超过部分截断
     return pwd_context.hash(password)
 
 
@@ -299,16 +305,5 @@ async def update_user(user_id: str, user_update: UserCreate, db: Session = Depen
     db.refresh(user)
     return {"id": user.id, "username": user.username, "email": user.email}
 
-# ==================== 配置 bcrypt，设置截断策略 ====================
-pwd_context = CryptContext(
-    schemes=["bcrypt"],
-    deprecated="auto",
-    bcrypt__truncate_error=False  # 自动截断过长的密码
-)
 
-def get_password_hash(password):
-    """生成密码哈希，自动处理过长密码"""
-    # bcrypt 限制 72 字节，超过部分截断
-    if len(password.encode('utf-8')) > 72:
-        password = password[:72]  # 截断到72字节
-    return pwd_context.hash(password)
+

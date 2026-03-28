@@ -5,38 +5,46 @@ from datetime import datetime, timedelta
 import time
 import uuid
 import os
+import sys
 import logging
 import asyncio
-
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, REGISTRY
 from sqlalchemy.orm import Session
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from contextlib import asynccontextmanager
 
-# ==================== 添加异常处理（saga导入异常时） ====================
+# ==================== 修改后（兼容本地和CI）====================
+# 动态添加路径，兼容本地开发和CI环境
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
+
+try:
+    from order_service.models import (
+        Order, OrderItem, OrderStatus, get_db, init_db, SessionLocal
+    )
+except ImportError:
+    # CI环境中使用相对导入
+    from models import (
+        Order, OrderItem, OrderStatus, get_db, init_db, SessionLocal
+    )
+
+# Saga导入（保持你原有的三层fallback）
 try:
     from order_service.saga import OrderSaga
 except ImportError:
     try:
         from .saga import OrderSaga
     except ImportError:
-        # 如果都不行，创建一个模拟类
-        class OrderSaga:
-            def __init__(self, *args, **kwargs):
-                pass
-            async def execute(self, *args, **kwargs):
-                return {"success": False, "error": "Saga not available"}
-
-# ==================== 关键修正：显式导入SessionLocal ====================
-from order_service.models import (
-    Order,
-    OrderItem,
-    OrderStatus,
-    get_db,
-    init_db,
-    SessionLocal  # 关键：供定时任务使用
-)
-from order_service.saga import OrderSaga
+        try:
+            from saga import OrderSaga
+        except ImportError:
+            class OrderSaga:
+                def __init__(self, *args, **kwargs):
+                    pass
+                async def execute(self, *args, **kwargs):
+                    return {"success": False, "error": "Saga not available"}
 
 # ==================== 配置 ====================
 logging.basicConfig(level=logging.INFO)

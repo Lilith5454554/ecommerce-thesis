@@ -1,8 +1,9 @@
-# product_service/main.py
 from fastapi import FastAPI, HTTPException, Request, Response, Depends, status
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
+import os
+import sys
 import os
 import time
 import uuid
@@ -11,9 +12,18 @@ import psutil
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
+# ==================== 修改后（兼容本地和CI）====================
+# 动态添加路径，兼容本地开发和CI环境
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
-from product_service.models import Product, get_db, init_db, SessionLocal
-
+try:
+    from product_service.models import Product, get_db, init_db, SessionLocal
+except ImportError:
+    # CI环境中使用相对导入
+    from models import Product, get_db, init_db, SessionLocal
 
 # ==================== Prometheus监控指标 ====================
 REQUEST_COUNT = Counter(
