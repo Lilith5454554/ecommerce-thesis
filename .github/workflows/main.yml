@@ -11,19 +11,69 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
-      
+
       - name: Install dependencies
         run: |
           cd user_service
           pip install -r requirements.txt
           pip install pytest pytest-cov
-      
+
       - name: Run tests
+        env:
+          PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/user_service"
         run: |
           cd user_service
+          pytest tests/ -v --cov=./ --cov-report=xml
+
+  # ==================== 新增：product-service 测试 ====================
+  test-product-service:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          cd product_service
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run tests
+        env:
+          PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/product_service:${{ github.workspace }}/product_service/.."
+        run: |
+          cd product_service
+          pytest tests/ -v --cov=./ --cov-report=xml
+
+  # ==================== 新增：order-service 测试 ====================
+  test-order-service:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          cd order_service
+          pip install -r requirements.txt
+          pip install pytest pytest-cov
+
+      - name: Run tests
+        env:
+          PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/order_service:${{ github.workspace }}/order_service/.."
+        run: |
+          cd order_service
           pytest tests/ -v --cov=./ --cov-report=xml
