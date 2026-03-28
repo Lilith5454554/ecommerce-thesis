@@ -70,8 +70,6 @@ ORDERS_CANCELLED = Counter('orders_cancelled_total', 'Total orders cancelled')
 ACTIVE_ORDERS = Gauge('active_orders', 'Number of active (pending) orders')
 SAGA_EXECUTIONS = Counter('saga_executions_total', 'Saga executions', ['result'])
 
-# ==================== FastAPI应用 ====================
-app = FastAPI(title="订单服务", description="电商平台订单管理服务 - 支持Saga分布式事务")
 
 # ==================== 定时任务调度器 ====================
 scheduler = AsyncIOScheduler()
@@ -134,6 +132,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Scheduler shutdown error: {e}")
 
+# ==================== FastAPI应用 ====================
+app = FastAPI(
+    title="订单服务",
+    description="电商平台订单管理服务 - 支持Saga分布式事务",
+    lifespan=lifespan  # 添加这个！
+)
 
 # ==================== 关键修正：定时任务使用正确导入的SessionLocal ====================
 async def cancel_unpaid_orders():

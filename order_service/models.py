@@ -1,4 +1,3 @@
-# order_service/models.py
 from sqlalchemy import create_engine, Column, String, Float, Integer, DateTime, ForeignKey, Enum, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, relationship
