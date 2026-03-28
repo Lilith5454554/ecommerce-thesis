@@ -5,6 +5,9 @@ import pytest
 from fastapi.testclient import TestClient
 from product_service.main import app
 from product_service.models import init_db, SessionLocal, Product
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 # 添加项目根目录到 Python 路径
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))

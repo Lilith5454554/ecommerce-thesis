@@ -1,11 +1,15 @@
-import sys
 import os
+import sys
 from pathlib import Path
 from datetime import datetime
 import pytest
 from fastapi.testclient import TestClient
 from order_service.main import app
 from order_service.models import init_db, SessionLocal, Order, OrderItem
+
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 # 添加项目根目录到 Python 路径
 project_root = Path(__file__).parent.parent.parent

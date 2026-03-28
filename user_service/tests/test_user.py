@@ -1,6 +1,8 @@
 import sys
 import os
 from pathlib import Path
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 # 添加项目根目录到 Python 路径
 project_root = Path(__file__).parent.parent.parent

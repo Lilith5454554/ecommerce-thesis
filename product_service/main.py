@@ -2,7 +2,6 @@ from fastapi import FastAPI, HTTPException, Request, Response, Depends, status
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
-import os
 import sys
 import os
 import time
