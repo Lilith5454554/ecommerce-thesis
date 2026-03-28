@@ -37,6 +37,14 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov
 
+      - name: Initialize database
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/user_service"
+        run: |
+          cd user_service
+          python -c "from models import init_db; init_db()"    
+
       - name: Run tests
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
@@ -76,6 +84,14 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov
 
+      - name: Initialize database
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/user_service"
+        run: |
+          cd user_service
+          python -c "from models import init_db; init_db()"
+
       - name: Run tests
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
@@ -114,6 +130,14 @@ jobs:
           cd order_service
           pip install -r requirements.txt
           pip install pytest pytest-cov
+
+      - name: Initialize database
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/user_service"
+        run: |
+          cd user_service
+          python -c "from models import init_db; init_db()"
 
       - name: Run tests
         env:
