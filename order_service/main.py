@@ -10,6 +10,7 @@ import logging
 import asyncio
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, REGISTRY
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from contextlib import asynccontextmanager
 
@@ -231,7 +232,7 @@ async def root():
 @app.get("/health")
 async def health(db: Session = Depends(get_db)):
     try:
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         db_status = "healthy"
     except Exception as e:
         db_status = f"unhealthy: {str(e)}"
@@ -346,7 +347,7 @@ async def compensate_stock_async(items: List[Dict]):
 async def get_orders(
         skip: int = 0,
         limit: int = 100,
-        status: Optional[str] = None,
+        status_param: Optional[str] = None,
         db: Session = Depends(get_db)
 ):
     query = db.query(Order)

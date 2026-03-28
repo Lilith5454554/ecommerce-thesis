@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Request, Response, Depends, status
+from fastapi import FastAPI, HTTPException, Request, Response, Depends
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime
@@ -9,7 +9,7 @@ import uuid
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, REGISTRY
 import psutil
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func,text
 
 # ==================== 修改后（兼容本地和CI）====================
 # 动态添加路径，兼容本地开发和CI环境
@@ -160,6 +160,9 @@ class ReleaseRequest(BaseModel):
     quantity: int
 
 
+class DecreaseRequest(BaseModel):  # 添加减少库存的请求模型
+    quantity: int
+
 # ==================== 监控端点 ====================
 @app.get("/metrics")
 async def get_metrics():
@@ -179,7 +182,7 @@ async def root():
 @app.get("/health")
 async def health(db: Session = Depends(get_db)):
     try:
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         db_status = "healthy"
     except Exception as e:
         db_status = f"unhealthy: {str(e)}"
@@ -258,7 +261,7 @@ async def update_product(product_id: str, product: ProductUpdate, db: Session = 
     if not db_product:
         raise HTTPException(status_code=404, detail="商品不存在")
 
-    update_data = product.dict(exclude_unset=True)
+    update_data = product.model_dump(exclude_unset=True)
     for key, value in update_data.items():
         setattr(db_product, key, value)
 
@@ -357,7 +360,13 @@ async def release_stock(
 
 
 @app.post("/products/{product_id}/stock/decrease")
-async def decrease_stock(product_id: str, quantity: int, db: Session = Depends(get_db)):
+async def decrease_stock(
+        product_id: str,
+        req: DecreaseRequest,  # 修复：使用 Pydantic 模型
+        db: Session = Depends(get_db)
+):
+    # 从 req 中获取 quantity
+    quantity = req.quantity
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="商品不存在")
