@@ -75,23 +75,8 @@ SAGA_EXECUTIONS = Counter('saga_executions_total', 'Saga executions', ['result']
 scheduler = AsyncIOScheduler()
 
 
-# ==================== 中间件 ====================
-@app.middleware("http")
-async def monitor_requests(request, call_next):
-    start_time = time.time()
-    response = await call_next(request)
-    duration = time.time() - start_time
 
-    REQUEST_COUNT.labels(
-        method=request.method,
-        endpoint=request.url.path,
-        status=response.status_code
-    ).inc()
-    REQUEST_LATENCY.labels(
-        method=request.method,
-        endpoint=request.url.path
-    ).observe(duration)
-    return response
+
 
 
 # ==================== 应用生命周期管理 ====================
@@ -121,9 +106,7 @@ async def lifespan(app: FastAPI):
         logger.info("✓ Scheduler started")
     except Exception as e:
         logger.error(f"Scheduler start error: {e}")
-
     yield  # 应用程序运行期间
-
     # ========== 关闭时执行 ==========
     logger.info("Shutting down order service...")
     try:
@@ -131,14 +114,29 @@ async def lifespan(app: FastAPI):
         logger.info("✓ Scheduler shutdown")
     except Exception as e:
         logger.error(f"Scheduler shutdown error: {e}")
-
-# ==================== FastAPI应用 ====================
+ # ==================== FastAPI应用 ====================
 app = FastAPI(
     title="订单服务",
     description="电商平台订单管理服务 - 支持Saga分布式事务",
     lifespan=lifespan  # 添加这个！
 )
+# ==================== 中间件 ====================
+@app.middleware("http")
+async def monitor_requests(request, call_next):
+    start_time = time.time()
+    response = await call_next(request)
+    duration = time.time() - start_time
 
+    REQUEST_COUNT.labels(
+        method=request.method,
+        endpoint=request.url.path,
+        status=response.status_code
+    ).inc()
+    REQUEST_LATENCY.labels(
+        method=request.method,
+        endpoint=request.url.path
+    ).observe(duration)
+    return response
 # ==================== 关键修正：定时任务使用正确导入的SessionLocal ====================
 async def cancel_unpaid_orders():
     """自动取消超过30分钟未支付的订单，并释放库存"""

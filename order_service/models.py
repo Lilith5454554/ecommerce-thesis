@@ -5,7 +5,11 @@ from datetime import datetime
 import enum
 import os
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://user:password@postgres:5432/ecommerce")
+# 从环境变量读取，CI中会设置 DATABASE_URL
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql://postgres:postgres@localhost:5432/test_db"  # 默认用localhost
+)
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

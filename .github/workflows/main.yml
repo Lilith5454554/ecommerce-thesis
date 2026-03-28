@@ -39,6 +39,7 @@ jobs:
 
       - name: Run tests
         env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
           PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/user_service"
         run: |
           cd user_service
@@ -77,6 +78,7 @@ jobs:
 
       - name: Run tests
         env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
           PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/product_service:${{ github.workspace }}/product_service/.."
         run: |
           cd product_service
@@ -115,6 +117,7 @@ jobs:
 
       - name: Run tests
         env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
           PYTHONPATH: "${{ github.workspace }}:${{ github.workspace }}/order_service:${{ github.workspace }}/order_service/.."
         run: |
           cd order_service
