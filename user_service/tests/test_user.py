@@ -68,7 +68,7 @@ def test_create_user():
     user_data = {
         "username": "testuser",
         "email": "test@example.com",
-        "password": "123456"
+        "password": "1234"
     }
     response = client.post("/users/", json=user_data)
     assert response.status_code == 201
@@ -86,7 +86,7 @@ def test_get_user_by_id():
     user_data = {
         "username": "getuser",
         "email": "get@example.com",
-        "password": "123456"
+        "password": "1234"
     }
     create_response = client.post("/users/", json=user_data)
     assert create_response.status_code == 201
@@ -112,7 +112,8 @@ def test_create_duplicate_user():
     """测试创建重复用户（可选）"""
     user_data = {
         "username": "duplicate",
-        "email": "duplicate@example.com"
+        "email": "duplicate@example.com",
+        "password": "1234"
     }
     # 第一次创建
     response1 = client.post("/users/", json=user_data)
@@ -129,7 +130,8 @@ def test_delete_user():
     # 先创建用户
     user_data = {
         "username": "deleteuser",
-        "email": "delete@example.com"
+        "email": "delete@example.com",
+        "password": "1234"
     }
     create_response = client.post("/users/", json=user_data)
     user_id = create_response.json()["id"]
