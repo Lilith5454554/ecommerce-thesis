@@ -3,10 +3,6 @@ import sys
 from pathlib import Path
 from datetime import datetime
 import pytest
-from fastapi.testclient import TestClient
-from order_service.main import app
-from order_service.models import init_db, SessionLocal, Order, OrderItem
-
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -15,9 +11,15 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
+from fastapi.testclient import TestClient
+from order_service.main import app
+from order_service.models import init_db, SessionLocal, Order, OrderItem
+
+# 创建数据库表
+init_db()
+print("✓ Order service tables created")
 
 client = TestClient(app)
-
 
 # ==================== 测试辅助函数 ====================
 def setup_function():
@@ -318,7 +320,6 @@ def test_update_order_status_not_found():
 
 
 # ==================== 取消订单测试 ====================
-
 def test_cancel_order():
     """测试取消订单"""
     # 先创建订单
@@ -386,7 +387,6 @@ def test_cancel_order_not_found():
 
 
 # ==================== 综合场景测试 ====================
-
 def test_order_lifecycle():
     """测试订单完整生命周期"""
     # 1. 创建订单

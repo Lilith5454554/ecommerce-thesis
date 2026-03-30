@@ -3,8 +3,7 @@ import os
 from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
-from product_service.main import app
-from product_service.models import init_db, SessionLocal, Product
+
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -12,12 +11,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-
-client = TestClient(app)
+from product_service.main import app
+from product_service.models import init_db, SessionLocal, Product
 
 # ==================== 创建数据库表 ====================
 init_db()
 print("✓ Product service tables created")
+
+client = TestClient(app)
 
 
 # ==================== 测试辅助函数 ====================
