@@ -166,16 +166,12 @@ class TokenResponse(BaseModel):
 
 
 # ==================== JWT工具函数 ====================
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
-
-
 def get_password_hash(password):
     """生成密码哈希，自动处理过长密码"""
     # bcrypt 限制 72 字节，超过部分截断
-    password_bytes = password.encode('utf-8')
-    if len(password_bytes) > 72:
-        password = password_bytes[:72].decode('utf-8', errors='ignore')
+#    password_bytes = password.encode('utf-8')
+#    if len(password_bytes) > 72:
+#        password = password_bytes[:72].decode('utf-8', errors='ignore')
     return pwd_context.hash(password)
 
 
@@ -189,6 +185,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
+def verify_password(plain_password, hashed_password):
+    """验证密码,用来验证函数"""
+    return pwd_context.verify(plain_password, hashed_password)
 
 # ==================== API端点 ====================
 @app.get("/")
