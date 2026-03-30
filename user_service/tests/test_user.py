@@ -68,7 +68,7 @@ def test_create_user():
     user_data = {
         "username": "testuser",
         "email": "test@example.com",
-        "password": "1234"
+        "password": "123456"
     }
     response = client.post("/users/", json=user_data)
     assert response.status_code == 201
@@ -85,7 +85,8 @@ def test_get_user_by_id():
     # 先创建一个用户
     user_data = {
         "username": "getuser",
-        "email": "get@example.com"
+        "email": "get@example.com",
+        "password": "123456"
     }
     create_response = client.post("/users/", json=user_data)
     assert create_response.status_code == 201
