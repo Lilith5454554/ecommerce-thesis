@@ -165,11 +165,7 @@ class TokenResponse(BaseModel):
     token_type: str
 
 
-# ==================== JWT工具函数 ====================
-#def get_password_hash(password):
-    """生成密码哈希，自动处理过长密码"""
-    # bcrypt 限制 72 字节，超过部分截断
-#    return pwd_context.hash(password)
+
 # ==================== 密码加密配置 ====================
 def get_password_hash(password: str) -> str:
     """生成密码哈希"""
@@ -192,15 +188,12 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-#def verify_password(plain_password, hashed_password):
-#    """验证密码,用来验证函数"""
-#    return pwd_context.verify(plain_password, hashed_password)
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """验证密码"""
     plain_bytes = str(plain_password).encode('utf-8')
     hashed_bytes = hashed_password.encode('utf-8')
     return bcrypt.checkpw(plain_bytes, hashed_bytes)
-
 
 
 # ==================== API端点 ====================

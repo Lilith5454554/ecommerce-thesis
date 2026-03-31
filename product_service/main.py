@@ -268,8 +268,23 @@ async def create_product(product: ProductCreate, db: Session = Depends(get_db)):
 
 
 @app.get("/products", response_model=List[ProductResponse])
-async def get_products(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    products = db.query(Product).offset(skip).limit(limit).all()
+async def get_products(
+        skip: int = 0,
+        limit: int = 100,
+        category: Optional[str] = None,
+        search: Optional[str] = None,
+        db: Session = Depends(get_db)
+):
+    query = db.query(Product)
+
+    if category:
+        query = query.filter(Product.category == category)
+
+    if search:
+        #使用 LIKE 进行模糊匹配，但限制结果
+        query = query.filter(Product.name.like(f"%{search}%"))
+
+    products = query.offset(skip).limit(limit).all()
     return [{
         "id": p.id,
         "name": p.name,
@@ -302,6 +317,13 @@ async def update_product(product_id: str, product: ProductUpdate, db: Session = 
     db_product = db.query(Product).filter(Product.id == product_id).first()
     if not db_product:
         raise HTTPException(status_code=404, detail="商品不存在")
+
+        #添加数据验证
+        if product.price is not None and product.price < 0:
+            raise HTTPException(status_code=422, detail="价格不能为负数")
+
+        if product.stock is not None and product.stock < 0:
+            raise HTTPException(status_code=422, detail="库存不能为负数")
 
     update_data = product.model_dump(exclude_unset=True)
     for key, value in update_data.items():
@@ -420,6 +442,23 @@ async def decrease_stock(
     db.commit()
 
     return {"product_id": product_id, "remaining_stock": product.stock}
+
+
+@app.post("/products/{product_id}/stock/increase")
+async def increase_stock(
+        product_id: str,
+        req: DecreaseRequest,
+        db: Session = Depends(get_db)
+):
+    """增加库存"""
+    quantity = req.quantity
+    product = db.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="商品不存在")
+
+    product.stock += quantity
+    db.commit()
+    return {"product_id": product_id, "current_stock": product.stock}
 
 
 @app.patch("/products/{product_id}", response_model=ProductResponse)
