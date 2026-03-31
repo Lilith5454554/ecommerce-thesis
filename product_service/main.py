@@ -242,6 +242,12 @@ async def health(db: Session = Depends(get_db)):
 # ==================== 商品CRUD ====================
 @app.post("/products", response_model=ProductResponse, status_code=201)
 async def create_product(product: ProductCreate, db: Session = Depends(get_db)):
+    #添加数据验证
+    if product.price < 0:
+        raise HTTPException(status_code=422, detail="价格不能为负数")
+
+    if product.stock < 0:
+        raise HTTPException(status_code=422, detail="库存不能为负数")
     product_id = str(uuid.uuid4())
 
     db_product = Product(
@@ -426,11 +432,10 @@ async def release_stock(
 @app.post("/products/{product_id}/stock/decrease")
 async def decrease_stock(
         product_id: str,
-        req: DecreaseRequest,  # 修复：使用 Pydantic 模型
+        quantity: int,  # ✅ 改为直接接收 query parameter
         db: Session = Depends(get_db)
 ):
-    # 从 req 中获取 quantity
-    quantity = req.quantity
+    """减少库存"""
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="商品不存在")
@@ -440,7 +445,6 @@ async def decrease_stock(
 
     product.stock -= quantity
     db.commit()
-
     return {"product_id": product_id, "remaining_stock": product.stock}
 
 
