@@ -255,9 +255,7 @@ async def health(db: Session = Depends(get_db)):
 # ==================== 核心API：创建订单（Saga事务）====================
 @app.post("/orders", response_model=OrderResponse, status_code=201)
 async def create_order(order: OrderCreate, db: Session = Depends(get_db)):
-    """
-    创建订单 - 使用Saga模式保证分布式事务一致性
-    """
+    """创建订单 - 使用Saga模式保证分布式事务一致性"""
     start_time = time.time()
 
     saga = OrderSaga(PRODUCT_SERVICE_URL)
@@ -351,8 +349,8 @@ async def get_orders(
         db: Session = Depends(get_db)
 ):
     query = db.query(Order)
-    if status:
-        query = query.filter(Order.status == status)
+    if status_param:
+        query = query.filter(Order.status == status_param)
 
     orders = query.offset(skip).limit(limit).all()
 
@@ -427,7 +425,7 @@ async def cancel_order(order_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="订单不存在")
 
     if order.status not in [OrderStatus.PENDING, OrderStatus.RESERVED]:
-        raise HTTPException(status_code=400, detail="Cannot cancel order in current status")
+        raise HTTPException(status_code=400, detail="订单状态不允许取消")
 
     # 释放库存
     saga = OrderSaga(PRODUCT_SERVICE_URL)

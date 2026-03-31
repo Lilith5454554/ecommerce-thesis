@@ -17,13 +17,13 @@ Base = declarative_base()
 
 
 class OrderStatus(str, enum.Enum):
+    """订单状态枚举"""
     PENDING = "pending"
     RESERVED = "reserved"
     PAID = "paid"
     SHIPPED = "shipped"
     COMPLETED = "completed"
     CANCELLED = "cancelled"
-    RESERVE_FAILED = "reserve_failed"
 
 
 class Order(Base):
