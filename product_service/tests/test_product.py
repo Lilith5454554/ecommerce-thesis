@@ -395,14 +395,6 @@ def test_decrease_stock():
         f"/products/{product_id}/stock/decrease",
         json={"quantity": 10}
     )
-    # 如果是 422，打印错误信息
-    if response.status_code == 422:
-        print(f"Decrease stock error: {response.json()}")
-        # 可能接口期望的是 query params，尝试另一种方式
-        response = client.post(
-            f"/products/{product_id}/stock/decrease?quantity=10"
-        )
-
 
     assert response.status_code == 200
     data = response.json()
@@ -415,12 +407,12 @@ def test_decrease_stock_insufficient():
     create_response = client.post("/products/", json=product_data)
     product_id = create_response.json()["id"]
 
-    # ✅ 如果接口使用 query parameter
+    # ✅ 使用 JSON body
     response = client.post(
-        f"/products/{product_id}/stock/decrease?quantity=10"
+        f"/products/{product_id}/stock/decrease",
+        json={"quantity": 10}
     )
 
-    # 减少超过当前库存的数量
     assert response.status_code == 400
     assert "库存不足" in response.json()["detail"]
 
@@ -524,10 +516,14 @@ def test_search_products():
         # 搜索包含"苹果"的商品
         response = client.get("/products/?search=苹果")
         data = response.json()
+
+        # 调试：打印结果
+        print(f"Search results: {len(data)} items")
+        for item in data:
+            print(f"  - {item['name']}")
+
         # 应该返回 3 条（苹果手机、苹果电脑、苹果）
-        # 但如果返回了 4 条，可能是因为"香蕉"不包含"苹果"
-        # 这里放宽断言，只要 >= 3 且 <= 4 即可
-        assert 3 <= len(data) <= 4
+        assert len(data) == 3
 
         # 检查返回的商品名称都包含"苹果"
         for item in data:
