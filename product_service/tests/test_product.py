@@ -496,11 +496,17 @@ def test_product_lifecycle():
 def test_search_products():
     """测试搜索商品"""
     # 先清空数据
-    from product_service.models import init_db, SessionLocal, Product
+    from product_service.models import SessionLocal, Product
     db = SessionLocal()
-    db.query(Product).delete()
-    db.commit()
-    db.close()
+    try:
+        deleted = db.query(Product).delete()
+        db.commit()
+        print(f"✓ Deleted {deleted} existing products")
+    except Exception as e:
+        db.rollback()
+        print(f"Error clearing: {e}")
+    finally:
+        db.close()
 
     # 创建一些商品
     products = [
@@ -510,24 +516,33 @@ def test_search_products():
         {"name": "苹果", "price": 8, "stock": 500, "category": "水果"}
     ]
 
+    created_ids = []
     for p in products:
-        client.post("/products/", json=p)
+        response = client.post("/products/", json=p)
+        assert response.status_code == 201, f"Failed to create {p['name']}: {response.json()}"
+        created_ids.append(response.json()["id"])
+        print(f"✓ Created: {p['name']} with id {response.json()['id']}")
 
-        # 搜索包含"苹果"的商品
-        response = client.get("/products/?search=苹果")
-        data = response.json()
+    # 验证所有商品都创建成功
+    response = client.get("/products/")
+    all_products = response.json()
+    print(f"Total products: {len(all_products)}")
+    assert len(all_products) == 4
 
-        # 调试：打印结果
-        print(f"Search results: {len(data)} items")
-        for item in data:
-            print(f"  - {item['name']}")
+    # ✅ 搜索包含"苹果"的商品
+    response = client.get("/products/?search=苹果")
+    data = response.json()
 
-        # 应该返回 3 条（苹果手机、苹果电脑、苹果）
-        assert len(data) == 3
+    print(f"Search results for '苹果': {len(data)} items")
+    for item in data:
+        print(f"  - {item['name']} (category: {item['category']})")
 
-        # 检查返回的商品名称都包含"苹果"
-        for item in data:
-            assert "苹果" in item["name"]
+    # 应该返回 3 条
+    assert len(data) == 3, f"Expected 3, got {len(data)}"
+
+    # 检查返回的商品名称都包含"苹果"
+    for item in data:
+        assert "苹果" in item["name"], f"Item '{item['name']}' does not contain '苹果'"
 
 
 def test_bulk_create_products():
