@@ -13,15 +13,15 @@ from sqlalchemy import text
 
 # ==================== 关键：统一从models导入所有数据库相关 ====================
 from user_service.models import User, get_db, init_db, SessionLocal
-from passlib.context import CryptContext
+import bcrypt
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 # ==================== 配置 bcrypt，设置截断策略（只定义一次，移到文件顶部）====================
-pwd_context = CryptContext(
+'''pwd_context = CryptContext(
     schemes=["bcrypt"],
     deprecated="auto",
     bcrypt__truncate_error=False  # 自动截断过长的密码
-)
+)'''
 
 # ==================== 修复 Prometheus 指标重复注册 ====================
 # 清除默认的 process collector，避免重复注册
@@ -166,13 +166,20 @@ class TokenResponse(BaseModel):
 
 
 # ==================== JWT工具函数 ====================
-def get_password_hash(password):
+#def get_password_hash(password):
     """生成密码哈希，自动处理过长密码"""
     # bcrypt 限制 72 字节，超过部分截断
-#    password_bytes = password.encode('utf-8')
-#    if len(password_bytes) > 72:
-#        password = password_bytes[:72].decode('utf-8', errors='ignore')
-    return pwd_context.hash(password)
+#    return pwd_context.hash(password)
+# ==================== 密码加密配置 ====================
+def get_password_hash(password: str) -> str:
+    """生成密码哈希"""
+    # 确保密码是字符串并编码
+    password_bytes = str(password).encode('utf-8')
+    # bcrypt 会自动处理长度，超过72字节会截断
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password_bytes, salt)
+    return hashed.decode('utf-8')
+
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -185,9 +192,16 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def verify_password(plain_password, hashed_password):
-    """验证密码,用来验证函数"""
-    return pwd_context.verify(plain_password, hashed_password)
+#def verify_password(plain_password, hashed_password):
+#    """验证密码,用来验证函数"""
+#    return pwd_context.verify(plain_password, hashed_password)
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """验证密码"""
+    plain_bytes = str(plain_password).encode('utf-8')
+    hashed_bytes = hashed_password.encode('utf-8')
+    return bcrypt.checkpw(plain_bytes, hashed_bytes)
+
+
 
 # ==================== API端点 ====================
 @app.get("/")
