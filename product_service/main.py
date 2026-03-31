@@ -150,6 +150,10 @@ class ProductResponse(BaseModel):
     category: Optional[str] = None
     created_at: datetime
 
+# 统一使用 JSON body
+class StockRequest(BaseModel):
+    quantity: int
+
 
 # ==================== 关键修正：库存操作Pydantic模型 ====================
 class ReserveRequest(BaseModel):
@@ -319,17 +323,21 @@ async def get_product(product_id: str, db: Session = Depends(get_db)):
 
 
 @app.put("/products/{product_id}", response_model=ProductResponse)
-async def update_product(product_id: str, product: ProductUpdate, db: Session = Depends(get_db)):
+async def update_product(
+        product_id: str,
+        product: ProductUpdate,
+        db: Session = Depends(get_db)
+):
     db_product = db.query(Product).filter(Product.id == product_id).first()
     if not db_product:
         raise HTTPException(status_code=404, detail="商品不存在")
 
         #添加数据验证
-        if product.price is not None and product.price < 0:
-            raise HTTPException(status_code=422, detail="价格不能为负数")
+    if product.price is not None and product.price < 0:
+        raise HTTPException(status_code=422, detail="价格不能为负数")
 
-        if product.stock is not None and product.stock < 0:
-            raise HTTPException(status_code=422, detail="库存不能为负数")
+    if product.stock is not None and product.stock < 0:
+        raise HTTPException(status_code=422, detail="库存不能为负数")
 
     update_data = product.model_dump(exclude_unset=True)
     for key, value in update_data.items():
@@ -432,10 +440,11 @@ async def release_stock(
 @app.post("/products/{product_id}/stock/decrease")
 async def decrease_stock(
         product_id: str,
-        quantity: int,  # ✅ 改为直接接收 query parameter
+        req: StockRequest,
         db: Session = Depends(get_db)
 ):
     """减少库存"""
+    quantity = req.quantity
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
         raise HTTPException(status_code=404, detail="商品不存在")
