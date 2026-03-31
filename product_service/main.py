@@ -163,6 +163,48 @@ class ReleaseRequest(BaseModel):
 class DecreaseRequest(BaseModel):  # 添加减少库存的请求模型
     quantity: int
 
+# ==================== 添加批量创建接口 ====================
+class BulkCreateRequest(BaseModel):
+    products: List[ProductCreate]
+
+
+@app.post("/products/bulk", response_model=List[ProductResponse])
+async def bulk_create_products(
+        request: BulkCreateRequest,
+        db: Session = Depends(get_db)
+):
+    """批量创建商品"""
+    created_products = []
+
+    for product_data in request.products:
+        product_id = str(uuid.uuid4())
+        db_product = Product(
+            id=product_id,
+            name=product_data.name,
+            description=product_data.description,
+            price=product_data.price,
+            stock=product_data.stock,
+            category=product_data.category
+        )
+        db.add(db_product)
+        created_products.append(db_product)
+
+    db.commit()
+
+    # 刷新对象以获取 created_at
+    for product in created_products:
+        db.refresh(product)
+
+    return [{
+        "id": p.id,
+        "name": p.name,
+        "description": p.description,
+        "price": p.price,
+        "stock": p.stock,
+        "category": p.category,
+        "created_at": p.created_at
+    } for p in created_products]
+
 # ==================== 监控端点 ====================
 @app.get("/metrics")
 async def get_metrics():
@@ -378,3 +420,31 @@ async def decrease_stock(
     db.commit()
 
     return {"product_id": product_id, "remaining_stock": product.stock}
+
+
+@app.patch("/products/{product_id}", response_model=ProductResponse)
+async def patch_product(
+    product_id: str,
+    product: ProductUpdate,
+    db: Session = Depends(get_db)
+):
+    """部分更新商品（PATCH）"""
+    db_product = db.query(Product).filter(Product.id == product_id).first()
+    if not db_product:
+        raise HTTPException(status_code=404, detail="商品不存在")
+
+    update_data = product.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_product, key, value)
+
+    db.commit()
+    db.refresh(db_product)
+    return {
+        "id": db_product.id,
+        "name": db_product.name,
+        "description": db_product.description,
+        "price": db_product.price,
+        "stock": db_product.stock,
+        "category": db_product.category,
+        "created_at": db_product.created_at
+    }
