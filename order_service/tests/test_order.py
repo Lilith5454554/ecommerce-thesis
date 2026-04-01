@@ -381,7 +381,7 @@ def test_order_lifecycle():
 
 def test_multiple_orders_same_user():
     """测试同一用户多个订单"""
-    user_id = 42
+    user_id = "42"
 
     # 创建3个订单
     for i in range(3):
