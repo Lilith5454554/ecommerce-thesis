@@ -1,10 +1,13 @@
+import os
+# 设置测试环境变量
+os.environ["PRODUCT_SERVICE_URL"] = "http://localhost:8002"
+os.environ["USER_SERVICE_URL"] = "http://localhost:8001"
 from fastapi import FastAPI, HTTPException, Response, Depends, status
 from pydantic import BaseModel
 from typing import Optional, List,Dict
 from datetime import datetime, timedelta
 import time
 import uuid
-import os
 import sys
 import logging
 import asyncio
