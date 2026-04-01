@@ -37,7 +37,7 @@ def setup_function():
         db.close()
 
 # ==================== 辅助函数 ====================
-def create_test_order(user_id=1, items=None):
+def create_test_order(user_id="1", items=None):
     """创建测试订单"""
     if items is None:
         items = [{"product_id": "101", "product_name": "测试商品", "quantity": 1, "price": 99.9}]
