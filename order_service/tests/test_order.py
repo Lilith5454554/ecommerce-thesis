@@ -115,8 +115,6 @@ def test_create_order_user_not_found():
 
 def test_create_order_invalid_user_id():
     """测试创建订单时用户ID无效"""
-    if order.user_id == "-1" or int(order.user_id) < 0:
-        raise HTTPException(status_code=400, detail="Invalid user ID")
     order_data = {
         "user_id": "-1",  # 无效的用户ID
         "shipping_address": "广州市天河区xx路3号",

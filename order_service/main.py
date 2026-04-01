@@ -290,6 +290,14 @@ async def create_order(order: OrderCreate, db: Session = Depends(get_db)):
     """创建订单 - 使用Saga模式保证分布式事务一致性"""
     start_time = time.time()
 
+    # ✅ 修复：验证 user_id
+    try:
+        user_id_int = int(order.user_id)
+        if user_id_int <= 0:
+            raise HTTPException(status_code=400, detail="无效的用户ID")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="无效的用户ID格式")
+
     saga = OrderSaga(PRODUCT_SERVICE_URL)
 
     items_data = [
@@ -431,17 +439,22 @@ async def update_order_status(order_id: str, status: str, db: Session = Depends(
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
 
+        # ✅ 修复：捕获无效状态并返回400
+    try:
+        new_status = OrderStatus(status)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"无效状态: {status}")
+
     valid_transitions = {
         OrderStatus.RESERVED: [OrderStatus.PAID, OrderStatus.CANCELLED],
         OrderStatus.PAID: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
         OrderStatus.SHIPPED: [OrderStatus.COMPLETED]
     }
 
-    new_status = OrderStatus(status)
     if new_status not in valid_transitions.get(order.status, []):
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid status transition from {order.status.value} to {status}"
+            detail=f"无效状态转换: {order.status.value} to {status}"
         )
 
     order.status = new_status
