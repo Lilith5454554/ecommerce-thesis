@@ -113,7 +113,7 @@ def test_create_order_user_not_found():
     order_data = {
         "user_id": "999",  # 不存在的用户
         "shipping_address": "上海市浦东新区xx路2号",
-        "items": [{"product_id": "101", "product_name": "商品A", "quantity": 1, "price": 100.0}]
+        "items": [{"product_id": "999", "product_name": "不存在的商品", "quantity": 1, "price": 100.0}]
     }
 
     response = client.post("/orders", json=order_data)
@@ -194,8 +194,10 @@ def test_get_orders_empty():
 def test_get_orders_with_data():
     """测试获取订单列表（有数据）"""
     # 先创建几个订单
-    create_test_order("1")
-    create_test_order("2")
+    order1 = {"user_id": "1", "shipping_address": "地址1",
+              "items": [{"product_id": "101", "product_name": "商品101", "quantity": 1, "price": 100.0}]}
+    order2 = {"user_id": "2", "shipping_address": "地址2",
+              "items": [{"product_id": "102", "product_name": "商品102", "quantity": 2, "price": 100.0}]}
 
     # 获取所有订单
     response = client.get("/orders")
