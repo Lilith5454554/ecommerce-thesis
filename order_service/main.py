@@ -290,7 +290,7 @@ async def create_order(order: OrderCreate, db: Session = Depends(get_db)):
     """创建订单 - 使用Saga模式保证分布式事务一致性"""
     start_time = time.time()
 
-    # ✅ 修复：验证 user_id
+    # 修复：验证 user_id
     try:
         user_id_int = int(order.user_id)
         if user_id_int <= 0:
@@ -385,12 +385,12 @@ async def compensate_stock_async(items: List[Dict]):
 async def get_orders(
         skip: int = 0,
         limit: int = 100,
-        status_param: Optional[str] = None,
+        user_id: Optional[str] = None,
         db: Session = Depends(get_db)
 ):
     query = db.query(Order)
-    if status_param:
-        query = query.filter(Order.status == status_param)
+    if user_id:
+        query = query.filter(Order.user_id == user_id)  # 筛选条件
 
     orders = query.offset(skip).limit(limit).all()
 
@@ -439,7 +439,7 @@ async def update_order_status(order_id: str, status: str, db: Session = Depends(
     if not order:
         raise HTTPException(status_code=404, detail="订单不存在")
 
-        # ✅ 修复：捕获无效状态并返回400
+        # 捕获无效状态并返回400
     try:
         new_status = OrderStatus(status)
     except ValueError:

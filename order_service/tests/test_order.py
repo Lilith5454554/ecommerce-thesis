@@ -211,10 +211,13 @@ def test_get_orders_filter_by_user():
 
     # 筛选用户1的订单
     response = client.get("/orders?user_id=1")
-    if response.status_code == 200:
-        data = response.json()
-        for order in data:
-            assert order["user_id"] == "1"
+    assert response.status_code == 200
+    data = response.json()
+
+    # ✅ 应该有2个订单
+    assert len(data) == 2
+    for order in data:
+        assert order["user_id"] == "1"
 
 
 def test_get_orders_with_pagination():
