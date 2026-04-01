@@ -102,9 +102,9 @@ def test_create_order_success():
 
     # 验证订单项
     assert len(data["items"]) == 2
-    assert data["items"][0]["product_id"] == 101
+    assert data["items"][0]["product_id"] == "101"
     assert data["items"][0]["quantity"] == 2
-    assert data["items"][1]["product_id"] == 102
+    assert data["items"][1]["product_id"] == "102"
     assert data["items"][1]["quantity"] == 1
 
 
@@ -198,6 +198,10 @@ def test_get_orders_with_data():
               "items": [{"product_id": "101", "product_name": "商品101", "quantity": 1, "price": 100.0}]}
     order2 = {"user_id": "2", "shipping_address": "地址2",
               "items": [{"product_id": "102", "product_name": "商品102", "quantity": 2, "price": 100.0}]}
+
+    # 添加这两行，实际创建订单
+    client.post("/orders", json=order1)
+    client.post("/orders", json=order2)
 
     # 获取所有订单
     response = client.get("/orders")
