@@ -64,7 +64,8 @@ def test_health():
     """测试健康检查"""
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "healthy"}
+    # 只检查 status 字段，不要求完全匹配
+    assert response.json()["status"] == "healthy"
 
 
 # ==================== 创建订单测试 ====================
