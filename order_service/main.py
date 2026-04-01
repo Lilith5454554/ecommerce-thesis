@@ -79,22 +79,6 @@ else:
 
 
 
-# Saga导入（保持你原有的三层fallback）
-'''try:
-    from order_service.saga import OrderSaga
-except ImportError:
-    try:
-        from .saga import OrderSaga
-    except ImportError:
-        try:
-            from saga import OrderSaga
-        except ImportError:
-            class OrderSaga:
-                def __init__(self, *args, **kwargs):
-                    pass
-                async def execute(self, *args, **kwargs):
-                    return {"success": False, "error": "Saga not available"}'''
-
 # ==================== 配置 ====================
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
