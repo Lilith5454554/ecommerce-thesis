@@ -214,7 +214,7 @@ def test_get_orders_filter_by_user():
     assert response.status_code == 200
     data = response.json()
 
-    # ✅ 应该有2个订单
+    # 应该有2个订单
     assert len(data) == 2
     for order in data:
         assert order["user_id"] == "1"
@@ -319,8 +319,11 @@ def test_cancel_order_already_shipped():
     assert create_resp.status_code == 201
     order_id = create_resp.json()["id"]
 
-    # 将订单状态改为 shipped
-    client.patch(f"/orders/{order_id}/status", params={"status": "shipped"})
+    # ✅ 正确顺序：RESERVED -> PAID -> SHIPPED
+    pay_resp = client.patch(f"/orders/{order_id}/status", params={"status": "paid"})
+    assert pay_resp.status_code == 200, "支付失败"
+    ship_resp = client.patch(f"/orders/{order_id}/status", params={"status": "shipped"})
+    assert ship_resp.status_code == 200, "发货失败"
 
     # 尝试取消
     response = client.post(f"/orders/{order_id}/cancel")
@@ -334,8 +337,11 @@ def test_cancel_order_already_completed():
     assert create_resp.status_code == 201
     order_id = create_resp.json()["id"]
 
-    # 将订单状态改为 completed
-    client.patch(f"/orders/{order_id}/status", params={"status": "completed"})
+    # 正确顺序：RESERVED -> PAID -> SHIPPED -> COMPLETED
+    client.patch(f"/orders/{order_id}/status", params={"status": "paid"})
+    client.patch(f"/orders/{order_id}/status", params={"status": "shipped"})
+    complete_resp = client.patch(f"/orders/{order_id}/status", params={"status": "completed"})
+    assert complete_resp.status_code == 200, "完成订单失败"
 
     # 尝试取消
     response = client.post(f"/orders/{order_id}/cancel")
