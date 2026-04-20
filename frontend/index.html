@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>电商平台演示</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>电商平台演示系统</h1>
+
+        <!-- 用户信息区域 -->
+        <div class="card">
+            <h2>用户操作</h2>
+            <div>
+                <input type="text" id="regUsername" placeholder="用户名">
+                <input type="email" id="regEmail" placeholder="邮箱">
+                <input type="password" id="regPassword" placeholder="密码">
+                <button id="registerBtn">注册</button>
+            </div>
+            <div>
+                <input type="text" id="loginUsername" placeholder="用户名">
+                <input type="password" id="loginPassword" placeholder="密码">
+                <button id="loginBtn">登录</button>
+            </div>
+            <div id="userInfo" style="margin-top:10px;"></div>
+        </div>
+
+        <!-- 商品操作区域 -->
+        <div class="card">
+            <h2>商品列表</h2>
+            <button id="listProductsBtn">刷新商品列表</button>
+            <ul id="productList"></ul>
+            <div>
+                <h3>创建商品（演示用）</h3>
+                <input type="text" id="prodName" placeholder="商品名称">
+                <input type="number" id="prodPrice" placeholder="价格">
+                <input type="number" id="prodStock" placeholder="库存">
+                <button id="createProductBtn">创建商品</button>
+            </div>
+        </div>
+
+        <!-- 订单操作区域 -->
+        <div class="card">
+            <h2>创建订单</h2>
+            <input type="text" id="orderProductId" placeholder="商品ID">
+            <input type="number" id="orderQuantity" placeholder="数量">
+            <input type="text" id="shippingAddress" placeholder="收货地址">
+            <button id="createOrderBtn">创建订单</button>
+            <div id="orderResult"></div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

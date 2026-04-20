@@ -1,12 +1,12 @@
 import sys
 import os
 from pathlib import Path
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) # 将父目录添加到模块搜索路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-# 添加项目根目录到 Python 路径
-project_root = Path(__file__).parent.parent.parent
-sys.path.insert(0, str(project_root))
+# 添加项目根目录到 Python 路径，确保Python能找到user_service模块，因为测试文件可能在子目录中。
+project_root = Path(__file__).parent.parent.parent# 获取项目根目录
+sys.path.insert(0, str(project_root))# 添加项目根目录到路径
 
 # 1. 先导入 models 并创建数据库表
 from user_service.models import init_db, SessionLocal,User
@@ -32,15 +32,16 @@ def setup_function():
     finally:
         db.close()
 
+# 创建FastAPI测试客户端。模拟HTTP请求，不需要真实启动服务器。
 client = TestClient(app)
 
 
 def test_root():
     """测试根路径"""
     response = client.get("/")
-    assert response.status_code == 200
+    assert response.status_code == 200# 期望HTTP 200成功
     data = response.json()
-    assert data["service"] == "User Service"
+    assert data["service"] == "User Service"# 期望服务名正确
 
 
 def test_health():
@@ -48,10 +49,8 @@ def test_health():
     response = client.get("/health")
     assert response.status_code == 200
     data = response.json()
-    # 只检查 status 和 service，不检查 database
-    assert data["status"] == "healthy"
+    assert data["status"] == "healthy" # 检查服务健康状态
     assert data["service"] == "user_service"
-    # 如果有 database 字段也没关系，不检查它
 
 
 def test_get_users():

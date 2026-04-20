@@ -1,30 +1,33 @@
-from fastapi import FastAPI, HTTPException, Response, Depends, status
+from fastapi import FastAPI, HTTPException, Response, Depends, status #web框架相关
 from fastapi.responses import Response
-from pydantic import BaseModel
-from typing import List, Optional
-import uuid
-import time
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, REGISTRY
+from pydantic import BaseModel #数据验证
+from typing import List, Optional#类型提示
+import uuid #生成唯一id
+import time #时间处理
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, REGISTRY #监控指标收集
 import prometheus_client
-import psutil
+import psutil #系统资源监控
 import os
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-
+from passlib.context import CryptContext
 # ==================== 关键：统一从models导入所有数据库相关 ====================
-from user_service.models import User, get_db, init_db, SessionLocal
-import bcrypt
-from datetime import datetime, timedelta
-from jose import JWTError, jwt
+try:
+    from user_service.models import User, get_db, init_db, SessionLocal
+except ImportError:
+    from models import User, get_db, init_db, SessionLocall #数据库模型
+import bcrypt #密码加密
+from datetime import datetime, timedelta #时间计算
+from jose import JWTError, jwt #jwt令牌处理
 # ==================== 配置 bcrypt，设置截断策略（只定义一次，移到文件顶部）====================
-'''pwd_context = CryptContext(
+pwd_context = CryptContext(
     schemes=["bcrypt"],
     deprecated="auto",
     bcrypt__truncate_error=False  # 自动截断过长的密码
-)'''
+)
 
 # ==================== 修复 Prometheus 指标重复注册 ====================
-# 清除默认的 process collector，避免重复注册
+# 清除默认的 process collector，也就是重复的监控收集器,避免重复注册
 try:
     REGISTRY.unregister(prometheus_client.ProcessCollector)
 except KeyError:
@@ -38,12 +41,14 @@ except KeyError:
 
 
 # ==================== Prometheus 监控指标（保持原有）====================
+#统计HTTP请求总数（按方法、端点、状态码分类）
 REQUEST_COUNT = Counter(
     'http_requests_total',
     'Total HTTP requests',
     ['method', 'endpoint', 'status']
 )
 
+#记录请求延迟时间
 REQUEST_LATENCY = Histogram(
     'http_request_duration_seconds',
     'HTTP request latency in seconds',
@@ -51,21 +56,25 @@ REQUEST_LATENCY = Histogram(
     buckets=(0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0)
 )
 
+#当前正在处理的请求数
 ACTIVE_REQUESTS = Gauge(
     'http_requests_active',
     'Number of active HTTP requests'
 )
 
+#系统中的用户总数
 TOTAL_USERS = Gauge(
     'user_service_total_users',
     'Total number of users in the system'
 )
 
+#进程内存使用量
 PROCESS_MEMORY = Gauge(
     'user_service_process_memory_bytes',
     'Process memory usage in bytes'
 )
 
+#进程CPU使用时间
 PROCESS_CPU = Gauge(
     'user_service_process_cpu_seconds_total',
     'Process CPU time in seconds'
@@ -73,9 +82,8 @@ PROCESS_CPU = Gauge(
 
 # ==================== JWT配置 ====================
 SECRET_KEY = os.getenv("SECRET_KEY", "ecommerce-dev-secret-key")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
+ALGORITHM = "HS256" # 加密算法
+ACCESS_TOKEN_EXPIRE_MINUTES = 30 # Token有效期30分钟
 
 # ==================== FastAPI应用 ====================
 app = FastAPI(title="User Service", description="用户服务")
@@ -112,6 +120,11 @@ async def monitor_requests(request, call_next):
 
 
 # ==================== 后台任务 ====================
+'''
+startup_event（启动时执行）：
+初始化数据库（创建表）
+启动后台任务更新系统指标
+'''
 @app.on_event("startup")
 async def startup_event():
     init_db()
@@ -119,6 +132,12 @@ async def startup_event():
     asyncio.create_task(update_system_metrics())
 
 
+'''
+update_system_metrics（每15秒执行）：
+从数据库查询用户总数
+获取进程内存和CPU使用率
+更新Prometheus指标
+'''
 async def update_system_metrics():
     import asyncio
     process = psutil.Process(os.getpid())
@@ -137,12 +156,15 @@ async def update_system_metrics():
 
 
 # ==================== Prometheus端点 ====================
+#监控指标。作用：暴露Prometheus格式的监控数据，供监控系统采集。
 @app.get("/metrics")
 async def get_metrics():
     return Response(content=generate_latest(REGISTRY), media_type="text/plain")
 
 
 # ==================== 数据模型 ====================
+#定义API请求和响应的数据结构，自动进行数据验证。
+
 class UserCreate(BaseModel):
     username: str
     email: str
@@ -164,9 +186,9 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str
 
-
-
 # ==================== 密码加密配置 ====================
+
+#使用bcrypt算法加密密码
 def get_password_hash(password: str) -> str:
     """生成密码哈希"""
     # 确保密码是字符串并编码
@@ -176,8 +198,14 @@ def get_password_hash(password: str) -> str:
     hashed = bcrypt.hashpw(password_bytes, salt)
     return hashed.decode('utf-8')
 
+#验证明文密码是否与哈希匹配
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """验证密码"""
+    plain_bytes = str(plain_password).encode('utf-8')
+    hashed_bytes = hashed_password.encode('utf-8')
+    return bcrypt.checkpw(plain_bytes, hashed_bytes)
 
-
+#创建包含用户信息的JWT访问令牌
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     if expires_delta:
@@ -189,14 +217,8 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     return encoded_jwt
 
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """验证密码"""
-    plain_bytes = str(plain_password).encode('utf-8')
-    hashed_bytes = hashed_password.encode('utf-8')
-    return bcrypt.checkpw(plain_bytes, hashed_bytes)
-
-
 # ==================== API端点 ====================
+#根路径。返回服务信息和可用端点列表。
 @app.get("/")
 async def root():
     return {
@@ -211,7 +233,7 @@ async def root():
         ]
     }
 
-
+#健康检查。检查服务和数据库状态，用于K8s健康探针。
 @app.get("/health")
 async def health_check():
     try:
@@ -229,12 +251,13 @@ async def health_check():
     }
 
 
+#获取所有用户。返回所有用户列表（可能不安全，生产环境需要权限控制）。
 @app.get("/users/", response_model=List[UserResponse])
 async def get_users(db: Session = Depends(get_db)):
     users = db.query(User).all()
     return [{"id": u.id, "username": u.username, "email": u.email} for u in users]
 
-
+#获取单个用户。根据ID查询用户信息，不存在返回404。
 @app.get("/users/{user_id}", response_model=UserResponse)
 async def get_user(user_id: str, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
@@ -242,7 +265,15 @@ async def get_user(user_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="User not found")
     return {"id": user.id, "username": user.username, "email": user.email}
 
-
+'''
+创建用户。流程：
+检查用户名是否已存在
+检查邮箱是否已存在
+生成UUID作为用户ID
+加密密码
+保存到数据库
+返回用户信息（不含密码）
+'''
 @app.post("/users/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_user(user: UserCreate, db: Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.username == user.username).first()
@@ -266,7 +297,13 @@ async def create_user(user: UserCreate, db: Session = Depends(get_db)):
 
     return {"id": db_user.id, "username": db_user.username, "email": db_user.email}
 
-
+'''
+用户登录。流程：
+根据用户名查找用户
+验证密码
+生成JWT令牌（包含用户ID和用户名）
+返回访问令牌
+'''
 @app.post("/auth/login", response_model=TokenResponse)
 async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == credentials.username).first()
@@ -285,7 +322,7 @@ async def login(credentials: LoginRequest, db: Session = Depends(get_db)):
 
     return {"access_token": access_token, "token_type": "bearer"}
 
-
+#删除用户。根据ID删除用户，返回删除确认。
 @app.delete("/users/{user_id}")
 async def delete_user(user_id: str, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
@@ -300,7 +337,7 @@ async def delete_user(user_id: str, db: Session = Depends(get_db)):
         "message": "User deleted successfully"
     }
 
-
+#更新用户。更新用户信息（用户名、邮箱、密码），如果字段为空则保持原值。
 @app.put("/users/{user_id}", response_model=UserResponse)
 async def update_user(user_id: str, user_update: UserCreate, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
