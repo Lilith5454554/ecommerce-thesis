@@ -2,7 +2,7 @@ import os
 # 设置测试环境变量
 os.environ["PRODUCT_SERVICE_URL"] = "http://localhost:8002"
 os.environ["USER_SERVICE_URL"] = "http://localhost:8001"
-from fastapi import FastAPI, HTTPException, Response, Depends, status
+from fastapi import FastAPI, HTTPException, Response, Depends, status,Request
 from pydantic import BaseModel
 from typing import Optional, List,Dict
 from datetime import datetime, timedelta
@@ -70,13 +70,25 @@ else:
         try:
             from .saga import OrderSaga
         except ImportError:
+            # 如果还是失败，定义回退类（但会打印错误）
+            import logging
+
+            logging.error("Failed to import OrderSaga, using fallback")
+
+
+            class OrderSaga:
+                async def execute(self, *args, **kwargs):
+                    return {"success": False, "error": "Saga not available"}
+
+
+            '''
             class OrderSaga:
                 def __init__(self, *args, **kwargs):
                     pass
 
                 async def execute(self, *args, **kwargs):
                     return {"success": False, "error": "Saga not available"}
-
+'''
 
 
 # ==================== 配置 ====================
@@ -106,10 +118,6 @@ SAGA_EXECUTIONS = Counter('saga_executions_total', 'Saga executions', ['result']
 
 # ==================== 定时任务调度器 ====================
 scheduler = AsyncIOScheduler()
-
-
-
-
 
 
 # ==================== 应用生命周期管理 ====================
@@ -286,17 +294,13 @@ async def health(db: Session = Depends(get_db)):
 
 # ==================== 核心API：创建订单（Saga事务）====================
 @app.post("/orders", response_model=OrderResponse, status_code=201)
-async def create_order(order: OrderCreate, db: Session = Depends(get_db)):
-    """创建订单 - 使用Saga模式保证分布式事务一致性"""
-    start_time = time.time()
+async def create_order(order: OrderCreate, request: Request, db: Session = Depends(get_db)):
+    # 从请求头获取用户 ID（由网关添加）
+    user_id = request.headers.get("X-User-ID")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Missing user ID")
 
-    # 修复：验证 user_id
-    try:
-        user_id_int = int(order.user_id)
-        if user_id_int <= 0:
-            raise HTTPException(status_code=400, detail="无效的用户ID")
-    except ValueError:
-        raise HTTPException(status_code=400, detail="无效的用户ID格式")
+    start_time = time.time()
 
     saga = OrderSaga(PRODUCT_SERVICE_URL)
 
@@ -311,7 +315,7 @@ async def create_order(order: OrderCreate, db: Session = Depends(get_db)):
     ]
 
     saga_result = await saga.execute(
-        user_id=order.user_id,
+        user_id=user_id,
         items=items_data,
         shipping_address=order.shipping_address
     )
@@ -321,11 +325,10 @@ async def create_order(order: OrderCreate, db: Session = Depends(get_db)):
     if not saga_result["success"]:
         raise HTTPException(status_code=400, detail=saga_result["error"])
 
-    # Saga成功，写入本地数据库
     try:
         db_order = Order(
             id=saga_result["order_id"],
-            user_id=order.user_id,
+            user_id=user_id,
             status=OrderStatus.RESERVED,
             total_amount=saga_result["total_amount"],
             shipping_address=order.shipping_address
@@ -381,7 +384,7 @@ async def compensate_stock_async(items: List[Dict]):
 
 
 # ==================== 查询API ====================
-@app.get("/orders", response_model=List[OrderResponse])
+@app.get("/orders/", response_model=List[OrderResponse])
 async def get_orders(
         skip: int = 0,
         limit: int = 100,

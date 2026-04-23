@@ -1,3 +1,15 @@
+function parseJwt(token) {
+    try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+        return JSON.parse(jsonPayload);
+    } catch(e) {
+        return null;
+    }
+}
+
+
 // 后端API网关地址
 const API_BASE = 'http://localhost:8000';
 let authToken = null;  // 存储JWT token
@@ -53,6 +65,16 @@ document.getElementById('loginBtn').onclick = async () => {
     try {
         const data = await request('/auth/login', 'POST', { username, password });
         authToken = data.access_token;
+
+        // 解析 token 获取用户 ID
+        const payload = parseJwt(authToken);
+        const userId = payload ? payload.sub : null;
+        if (userId) {
+            // 保存到全局变量（例如 window.currentUserId）
+            window.currentUserId = userId;
+        }
+
+
         document.getElementById('userInfo').innerHTML = `已登录: ${username} (Token 已保存)`;
         alert('登录成功！');
     } catch (err) {
@@ -113,7 +135,7 @@ document.getElementById('createOrderBtn').onclick = async () => {
         // 更好的做法是先调用 /products/{id} 获取商品信息
         const product = await request(`/products/${productId}`, 'GET');
         const orderData = {
-            user_id: 'demo-user-id',   // 实际应从 token 中解析，但为简化，我们传递一个模拟值
+            user_id: window.currentUserId,   // 使用真实用户 ID
             items: [{
                 product_id: productId,
                 product_name: product.name,
@@ -122,7 +144,7 @@ document.getElementById('createOrderBtn').onclick = async () => {
             }],
             shipping_address: address
         };
-        const result = await request('/orders/', 'POST', orderData, true);
+        const result = await request('/orders', 'POST', orderData, true);
         document.getElementById('orderResult').innerHTML = `订单创建成功！订单ID: ${result.id}, 总金额: ¥${result.total_amount}`;
     } catch (err) {
         alert(`创建订单失败: ${err.message}`);

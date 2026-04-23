@@ -88,7 +88,7 @@ services:
       - ecommerce-network
     volumes:
       - ./order_service:/app
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn main:app --host 0.0.0.0 --port 8080 --reload
 
   # API网关
   api-gateway:
@@ -99,7 +99,7 @@ services:
     environment:
       - USER_SERVICE_URL=http://user-service:8000
       - PRODUCT_SERVICE_URL=http://product-service:8000
-      - ORDER_SERVICE_URL=http://order-service:8000
+      - ORDER_SERVICE_URL=http://order-service:8080
       - SECRET_KEY=${SECRET_KEY:-ecommerce-dev-secret-key}  # 与用户服务相同
     depends_on:
       - user-service

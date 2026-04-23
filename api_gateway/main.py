@@ -1,4 +1,3 @@
-# api_gateway/main.py
 from fastapi import FastAPI, Request, HTTPException, Header, Depends
 from fastapi.responses import JSONResponse, Response
 import httpx
@@ -238,8 +237,54 @@ async def proxy_request(
             raise HTTPException(status_code=503, detail="服务不可用")
 
 
-# ==================== 路由（关键：订单路由需要JWT）====================
 
+
+# ==================== 添加了 CORS 中间件 ====================
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 开发环境允许所有来源，生产环境应指定具体域名
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+# ==================== 路由（单独为根路径添加路由）====================
+@app.post("/users/")
+async def users_root_post(request: Request):
+    """处理 POST /users/ 请求（注册）"""
+    return await proxy_request(USER_SERVICE_URL, "/users/", request)
+
+@app.post("/users")
+async def users_root_no_slash(request: Request):
+    """处理 POST /users 请求（注册，无尾部斜杠）"""
+    return await proxy_request(USER_SERVICE_URL, "/users/", request)
+
+@app.post("/auth/login")
+async def auth_login(request: Request):
+    """处理登录请求，转发到用户服务"""
+    return await proxy_request(USER_SERVICE_URL, "/auth/login", request)
+
+# 商品服务根路径
+@app.post("/products/")
+async def products_root_post(request: Request):
+    return await proxy_request(PRODUCT_SERVICE_URL, "/products", request)
+
+@app.get("/products/")
+async def products_root_get(request: Request):
+    return await proxy_request(PRODUCT_SERVICE_URL, "/products", request)
+
+# 订单服务根路径（需要认证）
+@app.post("/orders")
+async def orders_root_post(request: Request, user_id: str = Depends(verify_token)):
+    return await proxy_request(ORDER_SERVICE_URL, "/orders", request, extra_headers={"X-User-ID": user_id})
+
+@app.get("/orders")
+async def orders_root_get(request: Request, user_id: str = Depends(verify_token)):
+    return await proxy_request(ORDER_SERVICE_URL, "/orders", request, extra_headers={"X-User-ID": user_id})
+
+
+# ==================== 路由（关键：订单路由需要JWT）====================
 @app.api_route("/users/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def users_proxy(path: str, request: Request):
     full_path = f"/{path}" if path else "/"
@@ -248,7 +293,10 @@ async def users_proxy(path: str, request: Request):
 
 @app.api_route("/products/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
 async def products_proxy(path: str, request: Request):
-    full_path = f"/{path}" if path else "/"
+    if path:
+        full_path = f"/products/{path}"
+    else:
+        full_path = "/products"
     return await proxy_request(PRODUCT_SERVICE_URL, full_path, request)
 
 
@@ -259,7 +307,10 @@ async def orders_proxy(
         request: Request,
         user_id: str = Depends(verify_token)  # JWT验证
 ):
-    full_path = f"/{path}" if path else "/"
+    if path:
+        full_path = f"/orders/{path}"
+    else:
+        full_path = "/orders"
     return await proxy_request(
         ORDER_SERVICE_URL,
         full_path,
@@ -295,3 +346,6 @@ async def monitoring_status():
             "memory_percent": psutil.virtual_memory().percent
         }
     }
+
+
+
