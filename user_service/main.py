@@ -15,7 +15,7 @@ from passlib.context import CryptContext
 try:
     from user_service.models import User, get_db, init_db, SessionLocal
 except ImportError:
-    from models import User, get_db, init_db, SessionLocall #数据库模型
+    from models import User, get_db, init_db, SessionLocal #数据库模型
 import bcrypt #密码加密
 from datetime import datetime, timedelta #时间计算
 from jose import JWTError, jwt #jwt令牌处理
