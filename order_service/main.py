@@ -300,6 +300,15 @@ async def create_order(order: OrderCreate, request: Request, db: Session = Depen
     if not user_id:
         raise HTTPException(status_code=401, detail="Missing user ID")
 
+    # ✅ 添加对 user_id 值的有效性检查
+    try:
+        user_id_int = int(user_id)
+        if user_id_int <= 0:
+            raise HTTPException(status_code=400, detail="Invalid user ID")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid user ID format")
+
+
     start_time = time.time()
 
     saga = OrderSaga(PRODUCT_SERVICE_URL)
