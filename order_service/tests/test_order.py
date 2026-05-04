@@ -160,6 +160,7 @@ def test_create_order_multiple_items():
 
     headers = {"X-User-ID": "1"}
     response = client.post("/orders", json=order_data, headers=headers)
+    print("DEBUG:", response.status_code, response.text)
     assert response.status_code == 201
     data = response.json()
     assert len(data["items"]) == 4
@@ -202,7 +203,7 @@ def test_get_orders_with_data():
 
     # 添加这两行，实际创建订单
     client.post("/orders", json=order1, headers={"X-User-ID": "1"})
-    client.post("/orders", json=order2, headers={"X-User-ID": "1"})
+    client.post("/orders", json=order2, headers={"X-User-ID": "2"})
 
     # 获取所有订单
     response = client.get("/orders")
@@ -214,9 +215,12 @@ def test_get_orders_with_data():
 def test_get_orders_filter_by_user():
     """测试按用户筛选订单"""
     # 创建不同用户的订单
-    create_test_order("1")
-    create_test_order("2")
-    create_test_order("1")
+    resp1 = create_test_order("1")
+    assert resp1.status_code == 201, f"创建订单失败: {resp1.text}"
+    resp2 = create_test_order("2")
+    assert resp2.status_code == 201, f"创建订单失败: {resp2.text}"
+    resp3 = create_test_order("1")
+    assert resp3.status_code == 201, f"创建订单失败: {resp3.text}"
 
     # 筛选用户1的订单
     response = client.get("/orders?user_id=1")
