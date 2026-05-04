@@ -125,7 +125,7 @@ def test_create_order_invalid_user_id():
         "items": [{"product_id": "101", "product_name": "商品A", "quantity": 1, "price": 100.0}]
     }
 
-    headers = {"X-User-ID": "999"}
+    headers = {"X-User-ID": "-1"}
     response = client.post("/orders", json=order_data, headers=headers)
     # 应该返回400
     assert response.status_code == 400
@@ -139,7 +139,7 @@ def test_create_order_product_not_found():
         "items": [{"product_id": "99999", "product_name": "不存在的商品", "quantity": 1, "price": 100.0}]  # 不存在的商品
     }
 
-    headers = {"X-User-ID": "999"}
+    headers = {"X-User-ID": "1"}
     response = client.post("/orders", json=order_data, headers=headers)
     # 可能是400或201（用模拟数据）
     assert response.status_code in [400, 201]
@@ -158,7 +158,7 @@ def test_create_order_multiple_items():
         ]
     }
 
-    headers = {"X-User-ID": "999"}
+    headers = {"X-User-ID": "1"}
     response = client.post("/orders", json=order_data, headers=headers)
     assert response.status_code == 201
     data = response.json()
@@ -173,7 +173,7 @@ def test_create_order_empty_items():
         "items": []
     }
 
-    headers = {"X-User-ID": "999"}
+    headers = {"X-User-ID": "1"}
     response = client.post("/orders", json=order_data, headers=headers)
     assert response.status_code == 201
     data = response.json()
@@ -186,7 +186,7 @@ def test_create_order_empty_items():
 def test_get_orders_empty():
     """测试获取订单列表（初始为空）"""
     headers = {"X-User-ID": "999"}
-    response = client.get("/orders",json=order_data, headers=headers)
+    response = client.get("/orders",headers=headers)
     assert response.status_code == 200
     assert isinstance(response.json(), list)
     assert len(response.json()) == 0

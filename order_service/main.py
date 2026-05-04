@@ -384,7 +384,7 @@ async def compensate_stock_async(items: List[Dict]):
 
 
 # ==================== 查询API ====================
-@app.get("/orders/", response_model=List[OrderResponse])
+@app.get("/orders", response_model=List[OrderResponse])
 async def get_orders(
         skip: int = 0,
         limit: int = 100,
