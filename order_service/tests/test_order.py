@@ -20,7 +20,7 @@ init_db()
 print("✓ Order service tables created")
 
 client = TestClient(app)
-
+'''
 import pytest
 from unittest.mock import patch, AsyncMock
 @pytest.fixture(scope="module", autouse=True)
@@ -37,7 +37,7 @@ def mock_saga_module():
         })
         instance._release_stock = AsyncMock(return_value={"success": True})
         yield instance
-
+'''
 
 
 # ==================== 测试辅助函数 ====================

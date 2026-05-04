@@ -227,6 +227,8 @@ async def create_order(order: OrderCreate, request: Request, db: Session = Depen
     user_id = request.headers.get("X-User-ID")
     if not user_id or not user_id.strip():
         raise HTTPException(status_code=401, detail="Missing or empty user ID")
+    if user_id.startswith('-') or (user_id.isdigit() and int(user_id) <= 0):
+        raise HTTPException(status_code=400, detail="Invalid user ID")
     # 直接使用 user_id 字符串，不再转换为整数
 
     start_time = time.time()
