@@ -1,95 +1,22 @@
 import os
-# 设置测试环境变量
-os.environ["PRODUCT_SERVICE_URL"] = "http://localhost:8002"
-os.environ["USER_SERVICE_URL"] = "http://localhost:8001"
-from fastapi import FastAPI, HTTPException, Response, Depends, status,Request
-from pydantic import BaseModel
-from typing import Optional, List,Dict
-from datetime import datetime, timedelta
-import time
-import uuid
 import sys
 import logging
 import asyncio
+import time
+import uuid
+from datetime import datetime, timedelta
+from typing import Optional, List,Dict
+from fastapi import FastAPI, HTTPException, Response, Depends, status,Request
+from pydantic import BaseModel
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, REGISTRY
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from contextlib import asynccontextmanager
 
-# ==================== 修改后（兼容本地和CI）====================
-# 动态添加路径，兼容本地开发和CI环境
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.insert(0, parent_dir)
-
-try:
-    from order_service.models import (
-        Order, OrderItem, OrderStatus, get_db, init_db, SessionLocal
-    )
-except ImportError:
-    # CI环境中使用相对导入
-    from models import (
-        Order, OrderItem, OrderStatus, get_db, init_db, SessionLocal
-    )
-
-# ==================== 检测测试环境 ====================
-
-
-# 判断是否在测试环境中
-IN_TEST = 'pytest' in sys.modules or 'PYTEST_CURRENT_TEST' in os.environ
-
-# Saga导入
-if IN_TEST:
-    # 测试环境：使用 Mock 版本
-    class MockOrderSaga:
-        def __init__(self, *args, **kwargs):
-            pass
-
-        async def execute(self, user_id, items, shipping_address):
-            order_id = str(uuid.uuid4())
-            total_amount = sum(item["price"] * item["quantity"] for item in items)
-            return {
-                "success": True,
-                "order_id": order_id,
-                "total_amount": total_amount,
-                "reserved_items": items
-            }
-
-        async def _release_stock(self, product_id, quantity):
-            return {"success": True}
-
-
-    OrderSaga = MockOrderSaga
-else:
-    # 正常环境：使用真实 Saga
-    try:
-        from order_service.saga import OrderSaga
-    except ImportError:
-        try:
-            from .saga import OrderSaga
-        except ImportError:
-            # 如果还是失败，定义回退类（但会打印错误）
-            import logging
-
-            logging.error("Failed to import OrderSaga, using fallback")
-
-
-            class OrderSaga:
-                async def execute(self, *args, **kwargs):
-                    return {"success": False, "error": "Saga not available"}
-
-
-            '''
-            class OrderSaga:
-                def __init__(self, *args, **kwargs):
-                    pass
-
-                async def execute(self, *args, **kwargs):
-                    return {"success": False, "error": "Saga not available"}
-'''
-
+# ==================== 直接导入（删除所有动态判断）====================
+from models import Order, OrderItem, OrderStatus, get_db, init_db, SessionLocal
+from saga import OrderSaga
 
 # ==================== 配置 ====================
 logging.basicConfig(level=logging.INFO)
@@ -97,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 PRODUCT_SERVICE_URL = os.getenv("PRODUCT_SERVICE_URL", "http://product-service:8000")
 PAYMENT_TIMEOUT_MINUTES = 30
+
 
 # ==================== Prometheus监控 ====================
 REQUEST_COUNT = Counter(
@@ -297,17 +225,9 @@ async def health(db: Session = Depends(get_db)):
 async def create_order(order: OrderCreate, request: Request, db: Session = Depends(get_db)):
     # 从请求头获取用户 ID（由网关添加）
     user_id = request.headers.get("X-User-ID")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Missing user ID")
-
-    # ✅ 添加对 user_id 值的有效性检查
-    try:
-        user_id_int = int(user_id)
-        if user_id_int <= 0:
-            raise HTTPException(status_code=400, detail="Invalid user ID")
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user ID format")
-
+    if not user_id or not user_id.strip():
+        raise HTTPException(status_code=401, detail="Missing or empty user ID")
+    # 直接使用 user_id 字符串，不再转换为整数
 
     start_time = time.time()
 

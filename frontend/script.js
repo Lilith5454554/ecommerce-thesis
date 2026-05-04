@@ -19,8 +19,17 @@ async function request(endpoint, method, body = null, needAuth = false) {
     const headers = {
         'Content-Type': 'application/json',
     };
-    if (needAuth && authToken) {
+    if (needAuth) {
+        if (!authToken) {
+            throw new Error('未登录，请先登录');
+        }
         headers['Authorization'] = `Bearer ${authToken}`;
+        // 添加 X-User-ID 头（从登录后保存的 currentUserId 获取）
+        if (window.currentUserId) {
+            headers['X-User-ID'] = window.currentUserId;
+        } else {
+            throw new Error('无法获取用户ID，请重新登录');
+        }
     }
     const options = {
         method,
@@ -135,7 +144,7 @@ document.getElementById('createOrderBtn').onclick = async () => {
         // 更好的做法是先调用 /products/{id} 获取商品信息
         const product = await request(`/products/${productId}`, 'GET');
         const orderData = {
-            user_id: window.currentUserId,   // 使用真实用户 ID
+            user_id: window.currentUserId,
             items: [{
                 product_id: productId,
                 product_name: product.name,
