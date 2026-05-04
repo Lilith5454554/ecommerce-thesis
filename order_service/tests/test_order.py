@@ -21,6 +21,25 @@ print("✓ Order service tables created")
 
 client = TestClient(app)
 
+import pytest
+from unittest.mock import patch, AsyncMock
+@pytest.fixture(scope="module", autouse=True)
+def mock_saga_module():
+    """模块级别自动 Mock Saga"""
+    with patch('order_service.main.OrderSaga') as mock_class:
+        instance = mock_class.return_value
+        instance.execute = AsyncMock(return_value={
+            "success": True,
+            "order_id": "test-order-id",
+            "total_amount": 100.0,
+            "reserved_items": [],
+            "saga_id": "test-saga"
+        })
+        instance._release_stock = AsyncMock(return_value={"success": True})
+        yield instance
+
+
+
 # ==================== 测试辅助函数 ====================
 def setup_function():
     """每个测试前重置数据库"""
