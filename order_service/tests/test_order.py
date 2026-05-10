@@ -20,9 +20,10 @@ init_db()
 print("✓ Order service tables created")
 
 client = TestClient(app)
-
+import uuid
 import pytest
 from unittest.mock import patch, AsyncMock
+'''
 @pytest.fixture(scope="module", autouse=True)
 def mock_saga_module():
     """模块级别自动 Mock Saga"""
@@ -37,8 +38,30 @@ def mock_saga_module():
         })
         instance._release_stock = AsyncMock(return_value={"success": True})
         yield instance
+'''
 
 
+@pytest.fixture(scope="module", autouse=True)
+def mock_saga_module():
+    """模块级别自动 Mock Saga"""
+    with patch('order_service.main.OrderSaga') as mock_class:
+        instance = mock_class.return_value
+
+        # 动态生成结果，而不是固定值
+        async def dynamic_execute(user_id, items, shipping_address):
+            # 根据商品动态计算总金额
+            total_amount = sum(item["price"] * item["quantity"] for item in items)
+            return {
+                "success": True,
+                "order_id": str(uuid.uuid4()),  # ✅ 每次生成不同ID，避免主键冲突
+                "total_amount": total_amount,  # ✅ 动态计算金额
+                "reserved_items": items,
+                "saga_id": "test-saga"
+            }
+
+        instance.execute = AsyncMock(side_effect=dynamic_execute)
+        instance._release_stock = AsyncMock(return_value={"success": True})
+        yield instance
 
 # ==================== 测试辅助函数 ====================
 def setup_function():
