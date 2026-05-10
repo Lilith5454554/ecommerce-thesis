@@ -38,11 +38,27 @@ REQUEST_LATENCY = Histogram(
     ['method', 'endpoint']
 )
 
-ORDERS_CREATED = Counter('orders_created_total', 'Total orders created', ['status'])
-ORDERS_CANCELLED = Counter('orders_cancelled_total', 'Total orders cancelled')
-ACTIVE_ORDERS = Gauge('active_orders', 'Number of active (pending) orders')
-SAGA_EXECUTIONS = Counter('saga_executions_total', 'Saga executions', ['result'])
+ORDERS_CREATED = Counter(
+    'orders_created_total',
+    'Total orders created',
+    ['status']
+)
 
+ORDERS_CANCELLED = Counter(
+    'orders_cancelled_total',
+    'Total orders cancelled'
+)
+
+ACTIVE_ORDERS = Gauge(
+    'active_orders',
+    'Number of active (pending) orders'
+)
+
+SAGA_EXECUTIONS = Counter(
+    'saga_executions_total',
+    'Saga executions',
+    ['result']
+)
 
 # ==================== 定时任务调度器 ====================
 scheduler = AsyncIOScheduler()

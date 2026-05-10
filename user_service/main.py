@@ -8,6 +8,7 @@ from prometheus_client import Counter, Histogram, Gauge, generate_latest, REGIST
 import prometheus_client
 import psutil #系统资源监控
 import os
+import asyncio
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from passlib.context import CryptContext
@@ -139,7 +140,6 @@ update_system_metrics（每15秒执行）：
 更新Prometheus指标
 '''
 async def update_system_metrics():
-    import asyncio
     process = psutil.Process(os.getpid())
     while True:
         db = SessionLocal()

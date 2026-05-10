@@ -10,7 +10,7 @@ jobs:
   test-user-service:
     runs-on: ubuntu-latest
 
-    # ✅ 添加 PostgreSQL 服务
+    # 添加 PostgreSQL 服务
     services:
       postgres:
         image: postgres:15
