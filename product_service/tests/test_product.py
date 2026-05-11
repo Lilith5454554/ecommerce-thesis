@@ -566,7 +566,7 @@ def test_bulk_create_products():
 
 
 
-    def test_calculate_discount_price():
-        """测试折扣价格计算（只测正常情况，故意不测边界条件）"""
-        result = calculate_discount_price(100, 0.8)
-        assert result == 80.0
+ def test_calculate_discount_price():
+    """测试折扣价格计算（只测正常情况，故意不测边界条件）"""
+    result = calculate_discount_price(100, 0.8)
+    assert result == 80.0
