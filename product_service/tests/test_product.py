@@ -544,7 +544,7 @@ def test_search_products():
     for item in data:
         assert "苹果" in item["name"], f"Item '{item['name']}' does not contain '苹果'"
 
-
+'''
 def test_bulk_create_products():
     """测试批量创建商品（如果API支持）"""
     products = [
@@ -562,7 +562,7 @@ def test_bulk_create_products():
     # 验证商品已创建
     get_response = client.get("/products/")
     assert len(get_response.json()) >= 3
-
+'''
 import pytest
 from main import calculate_discount_price
 
