@@ -562,3 +562,20 @@ def test_bulk_create_products():
     # 验证商品已创建
     get_response = client.get("/products/")
     assert len(get_response.json()) >= 3
+
+    import pytest
+    from main import calculate_discount_price
+
+    def test_calculate_discount_price_normal():
+        """测试正常折扣计算（只测试正常情况，不测边界）"""
+        result = calculate_discount_price(100, 0.8)
+        assert result == 80.0
+
+    def test_calculate_discount_price_half():
+        """测试五折"""
+        result = calculate_discount_price(100, 0.5)
+        assert result == 50.0
+
+    # 故意不写边界条件测试：
+    # 原价为0、负数的情况
+    # 折扣率为0、1、超出范围的情况
