@@ -500,3 +500,20 @@ async def patch_product(
         "category": db_product.category,
         "created_at": db_product.created_at
     }
+
+
+
+def calculate_discount_price(original_price: float, discount_rate: float) -> float:
+    """
+    计算折扣后价格
+    参数:
+        original_price: 原价
+        discount_rate: 折扣率（0到1之间）
+    返回:
+        折扣后价格
+    """
+    if original_price <= 0:
+        raise ValueError("原价必须大于0")
+    if discount_rate < 0 or discount_rate > 1:
+        raise ValueError("折扣率必须在0到1之间")
+    return round(original_price * discount_rate, 2)

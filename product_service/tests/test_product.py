@@ -562,3 +562,11 @@ def test_bulk_create_products():
     # 验证商品已创建
     get_response = client.get("/products/")
     assert len(get_response.json()) >= 3
+
+
+
+
+    def test_calculate_discount_price():
+        """测试折扣价格计算（只测正常情况，故意不测边界条件）"""
+        result = calculate_discount_price(100, 0.8)
+        assert result == 80.0
