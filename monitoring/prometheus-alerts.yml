@@ -1,0 +1,314 @@
+# ============================================
+# SLO (Service Level Objective) 告警规则配置
+# 电商平台可观测性 - 告警规则
+# ============================================
+
+groups:
+  # ==========================================
+  # 1. API 可用性 SLO 告警 (目标: 99.9%)
+  # ==========================================
+  - name: slo_availability
+    interval: 30s
+    rules:
+      # 记录每个服务的可用性指标
+      - record: slo:availability:ratio_5m
+        expr: |
+          (
+            sum(rate(gateway_requests_total{status_code!~"5.."}[5m]))
+            /
+            sum(rate(gateway_requests_total[5m]))
+          ) or on() vector(1)
+        labels:
+          slo_target: "0.999"
+          
+      - record: slo:availability:ratio_1h
+        expr: |
+          (
+            sum(rate(gateway_requests_total{status_code!~"5.."}[1h]))
+            /
+            sum(rate(gateway_requests_total[1h]))
+          ) or on() vector(1)
+        labels:
+          slo_target: "0.999"
+
+      - record: slo:availability:ratio_1d
+        expr: |
+          (
+            sum(rate(gateway_requests_total{status_code!~"5.."}[1d]))
+            /
+            sum(rate(gateway_requests_total[1d]))
+          ) or on() vector(1)
+        labels:
+          slo_target: "0.999"
+
+      # 按服务细分的可用性
+      - record: slo:availability_by_service:ratio_5m
+        expr: |
+          (
+            sum by (service) (rate(gateway_requests_total{status_code!~"5.."}[5m]))
+            /
+            sum by (service) (rate(gateway_requests_total[5m]))
+          ) or on(service) vector(1)
+
+  # ==========================================
+  # 2. 延迟 SLO 告警 (目标: P95 < 500ms)
+  # ==========================================
+  - name: slo_latency
+    interval: 30s
+    rules:
+      # 记录P95延迟
+      - record: slo:latency:p95_5m
+        expr: |
+          histogram_quantile(0.95, 
+            sum by (le) (rate(gateway_request_duration_seconds_bucket[5m]))
+          )
+        labels:
+          slo_target_ms: "500"
+
+      - record: slo:latency:p95_by_service:5m
+        expr: |
+          histogram_quantile(0.95, 
+            sum by (service, le) (rate(gateway_request_duration_seconds_bucket[5m]))
+          )
+        labels:
+          slo_target_ms: "500"
+
+      # 记录P99延迟
+      - record: slo:latency:p99_5m
+        expr: |
+          histogram_quantile(0.99, 
+            sum by (le) (rate(gateway_request_duration_seconds_bucket[5m]))
+          )
+        labels:
+          slo_target_ms: "1000"
+
+  # ==========================================
+  # 3. 错误率 SLO 告警 (目标: < 0.1%)
+  # ==========================================
+  - name: slo_error_rate
+    interval: 30s
+    rules:
+      - record: slo:error_rate:ratio_5m
+        expr: |
+          (
+            sum(rate(gateway_requests_total{status_code=~"5.."}[5m]))
+            /
+            sum(rate(gateway_requests_total[5m]))
+          ) or on() vector(0)
+        labels:
+          slo_target: "0.001"
+
+      - record: slo:error_rate:ratio_1h
+        expr: |
+          (
+            sum(rate(gateway_requests_total{status_code=~"5.."}[1h]))
+            /
+            sum(rate(gateway_requests_total[1h]))
+          ) or on() vector(0)
+        labels:
+          slo_target: "0.001"
+
+      # 按服务细分的错误率
+      - record: slo:error_rate_by_service:ratio_5m
+        expr: |
+          (
+            sum by (service) (rate(gateway_requests_total{status_code=~"5.."}[5m]))
+            /
+            sum by (service) (rate(gateway_requests_total[5m]))
+          ) or on(service) vector(0)
+
+  # ==========================================
+  # 4. 业务指标告警
+  # ==========================================
+  - name: business_metrics
+    interval: 1m
+    rules:
+      # 订单创建速率
+      - record: business:orders:creation_rate_5m
+        expr: rate(orders_created_total[5m])
+
+      # 订单取消率
+      - record: business:orders:cancellation_rate_5m
+        expr: |
+          (
+            rate(orders_cancelled_total[5m])
+            /
+            rate(orders_created_total[5m])
+          ) or on() vector(0)
+
+      # Saga事务成功率
+      - record: business:saga:success_rate_5m
+        expr: |
+          (
+            rate(saga_executions_total{result="success"}[5m])
+            /
+            rate(saga_executions_total[5m])
+          ) or on() vector(1)
+
+  # ==========================================
+  # 5. 资源使用告警
+  # ==========================================
+  - name: resource_usage
+    interval: 30s
+    rules:
+      # 各服务内存使用率
+      - record: resource:memory_usage:percent
+        expr: |
+          (
+            gateway_memory_usage_percent or
+            user_service_process_memory_bytes / 1024 / 1024 / 1024 * 100 or
+            product_service_memory_usage_bytes / 1024 / 1024 / 1024 * 100
+          )
+
+      # 各服务CPU使用率
+      - record: resource:cpu_usage:percent
+        expr: |
+          (
+            gateway_cpu_usage_percent or
+            user_service_process_cpu_seconds_total * 100 or
+            product_service_cpu_usage_percent
+          )
+
+  # ==========================================
+  # 6. 实际告警规则
+  # ==========================================
+  - name: critical_alerts
+    interval: 30s
+    rules:
+      # 严重：服务宕机
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "服务 {{ $labels.job }} 宕机"
+          description: "服务 {{ $labels.job }} 已经超过1分钟没有响应"
+          runbook_url: "https://wiki.example.com/runbooks/service-down"
+
+      # 严重：可用性低于SLO (99.9%)
+      - alert: AvailabilityBelowSLO
+        expr: slo:availability:ratio_5m < 0.999
+        for: 5m
+        labels:
+          severity: critical
+          slo: availability
+        annotations:
+          summary: "API可用性低于SLO目标"
+          description: "当前5分钟可用性为 {{ $value | humanizePercentage }}，低于目标 99.9%"
+          dashboard: "http://localhost:3000/d/slo-dashboard"
+
+      # 警告：可用性下降趋势
+      - alert: AvailabilityDegrading
+        expr: slo:availability:ratio_5m < 0.9995
+        for: 2m
+        labels:
+          severity: warning
+          slo: availability
+        annotations:
+          summary: "API可用性下降"
+          description: "当前5分钟可用性为 {{ $value | humanizePercentage }}，需要关注"
+
+      # 严重：P95延迟超过SLO (500ms)
+      - alert: HighLatencyP95
+        expr: slo:latency:p95_5m > 0.5
+        for: 5m
+        labels:
+          severity: critical
+          slo: latency
+        annotations:
+          summary: "P95延迟超过SLO目标"
+          description: "当前P95延迟为 {{ $value | humanizeDuration }}，超过目标 500ms"
+
+      # 警告：P99延迟过高
+      - alert: HighLatencyP99
+        expr: slo:latency:p99_5m > 1
+        for: 5m
+        labels:
+          severity: warning
+          slo: latency
+        annotations:
+          summary: "P99延迟过高"
+          description: "当前P99延迟为 {{ $value | humanizeDuration }}"
+
+      # 严重：错误率超过SLO (0.1%)
+      - alert: HighErrorRate
+        expr: slo:error_rate:ratio_5m > 0.001
+        for: 5m
+        labels:
+          severity: critical
+          slo: error_rate
+        annotations:
+          summary: "错误率超过SLO目标"
+          description: "当前5分钟错误率为 {{ $value | humanizePercentage }}，超过目标 0.1%"
+
+      # 警告：错误率上升
+      - alert: ErrorRateIncreasing
+        expr: slo:error_rate:ratio_5m > 0.0005
+        for: 3m
+        labels:
+          severity: warning
+          slo: error_rate
+        annotations:
+          summary: "错误率上升"
+          description: "当前5分钟错误率为 {{ $value | humanizePercentage }}"
+
+      # 警告：订单取消率过高
+      - alert: HighOrderCancellationRate
+        expr: business:orders:cancellation_rate_5m > 0.1
+        for: 10m
+        labels:
+          severity: warning
+          team: business
+        annotations:
+          summary: "订单取消率过高"
+          description: "订单取消率达到 {{ $value | humanizePercentage }}，可能存在支付或库存问题"
+
+      # 警告：Saga事务失败率上升
+      - alert: SagaFailureRateHigh
+        expr: business:saga:success_rate_5m < 0.95
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Saga事务成功率下降"
+          description: "Saga事务成功率为 {{ $value | humanizePercentage }}，可能存在分布式事务问题"
+
+      # 警告：内存使用率过高
+      - alert: HighMemoryUsage
+        expr: gateway_memory_usage_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "内存使用率过高"
+          description: "网关内存使用率达到 {{ $value }}%"
+
+      # 警告：CPU使用率过高
+      - alert: HighCPUUsage
+        expr: gateway_cpu_usage_percent > 80
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "CPU使用率过高"
+          description: "网关CPU使用率达到 {{ $value }}%"
+
+      # 信息：慢请求检测
+      - alert: SlowRequestsDetected
+        expr: |
+          (
+            histogram_quantile(0.95, 
+              sum by (le) (rate(gateway_request_duration_seconds_bucket[5m]))
+            ) > 0.2
+          )
+        for: 10m
+        labels:
+          severity: info
+        annotations:
+          summary: "检测到慢请求"
+          description: "P95响应时间持续超过 200ms"

@@ -1,24 +1,67 @@
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+  external_labels:
+    cluster: 'ecommerce'
+    replica: 'primary'
+
+# 告警规则文件
+rule_files:
+  - 'alerts.yml'
+
+# AlertManager配置
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
 
 scrape_configs:
+  # ==========================================
+  # 应用服务指标采集
+  # ==========================================
+  
   - job_name: 'user-service'
     static_configs:
       - targets: ['user-service:8000']
     metrics_path: /metrics
+    scrape_interval: 15s
 
   - job_name: 'product-service'
     static_configs:
       - targets: ['product-service:8000']
     metrics_path: /metrics
+    scrape_interval: 15s
 
   - job_name: 'order-service'
     static_configs:
       - targets: ['order-service:8000']
     metrics_path: /metrics
+    scrape_interval: 15s
 
   - job_name: 'api-gateway'
     static_configs:
       - targets: ['api-gateway:8000']
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  # ==========================================
+  # 基础设施指标采集
+  # ==========================================
+  
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'alertmanager'
+    static_configs:
+      - targets: ['alertmanager:9093']
+
+  # ==========================================
+  # 可观测性组件自监控
+  # ==========================================
+  
+  - job_name: 'jaeger'
+    static_configs:
+      - targets: ['jaeger:16687']
     metrics_path: /metrics

@@ -3,7 +3,9 @@ import sys
 from pathlib import Path
 from datetime import datetime
 import pytest
-
+import uuid
+import pytest
+from unittest.mock import patch, AsyncMock
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
@@ -20,26 +22,6 @@ init_db()
 print("✓ Order service tables created")
 
 client = TestClient(app)
-import uuid
-import pytest
-from unittest.mock import patch, AsyncMock
-'''
-@pytest.fixture(scope="module", autouse=True)
-def mock_saga_module():
-    """模块级别自动 Mock Saga"""
-    with patch('order_service.main.OrderSaga') as mock_class:
-        instance = mock_class.return_value
-        instance.execute = AsyncMock(return_value={
-            "success": True,
-            "order_id": "test-order-id",
-            "total_amount": 100.0,
-            "reserved_items": [],
-            "saga_id": "test-saga"
-        })
-        instance._release_stock = AsyncMock(return_value={"success": True})
-        yield instance
-'''
-
 
 @pytest.fixture(scope="module", autouse=True)
 def mock_saga_module():
@@ -53,8 +35,8 @@ def mock_saga_module():
             total_amount = sum(item["price"] * item["quantity"] for item in items)
             return {
                 "success": True,
-                "order_id": str(uuid.uuid4()),  # ✅ 每次生成不同ID，避免主键冲突
-                "total_amount": total_amount,  # ✅ 动态计算金额
+                "order_id": str(uuid.uuid4()),  # 每次生成不同ID，避免主键冲突
+                "total_amount": total_amount,  # 动态计算金额
                 "reserved_items": items,
                 "saga_id": "test-saga"
             }

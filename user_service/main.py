@@ -20,6 +20,16 @@ except ImportError:
 import bcrypt #密码加密
 from datetime import datetime, timedelta #时间计算
 from jose import JWTError, jwt #jwt令牌处理
+
+# ==================== OpenTelemetry 链路追踪 ====================
+import sys
+sys.path.append('/app/monitoring')
+try:
+    from tracing import init_tracing
+    TRACING_ENABLED = True
+except ImportError:
+    TRACING_ENABLED = False
+    print("Tracing not available")
 # ==================== 配置 bcrypt，设置截断策略（只定义一次，移到文件顶部）====================
 pwd_context = CryptContext(
     schemes=["bcrypt"],
@@ -88,6 +98,10 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30 # Token有效期30分钟
 
 # ==================== FastAPI应用 ====================
 app = FastAPI(title="User Service", description="用户服务")
+
+# ==================== 初始化链路追踪 ====================
+if TRACING_ENABLED:
+    init_tracing("user-service", app=app)
 
 
 # ==================== 中间件 ====================

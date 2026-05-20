@@ -18,6 +18,15 @@ from contextlib import asynccontextmanager
 from models import Order, OrderItem, OrderStatus, get_db, init_db, SessionLocal
 from saga import OrderSaga
 
+# ==================== OpenTelemetry 链路追踪 ====================
+sys.path.append('/app/monitoring')
+try:
+    from tracing import init_tracing
+    TRACING_ENABLED = True
+except ImportError:
+    TRACING_ENABLED = False
+    print("Tracing not available")
+
 # ==================== 配置 ====================
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -103,8 +112,13 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="订单服务",
     description="电商平台订单管理服务 - 支持Saga分布式事务",
-    lifespan=lifespan  # 添加这个！
+    lifespan=lifespan
 )
+
+# ==================== 初始化链路追踪 ====================
+if TRACING_ENABLED:
+    init_tracing("order-service", app=app)
+
 # ==================== 中间件 ====================
 @app.middleware("http")
 async def monitor_requests(request, call_next):

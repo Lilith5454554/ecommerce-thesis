@@ -1,7 +1,8 @@
-version: '3.8'
-
 services:
-  # 数据库
+  # ==========================================
+  # 基础设施层
+  # ==========================================
+
   postgres:
     image: postgres:15
     container_name: ecommerce-postgres
@@ -21,7 +22,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis缓存
   redis:
     image: redis:7-alpine
     container_name: ecommerce-redis
@@ -29,13 +29,11 @@ services:
       - "6379:6379"
     networks:
       - ecommerce-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
-  # 用户服务
+  # ==========================================
+  # 应用服务层
+  # ==========================================
+
   user-service:
     build: ./user_service
     container_name: user-service
@@ -43,7 +41,7 @@ services:
       - "8001:8000"
     environment:
       - DATABASE_URL=postgresql://user:password@postgres:5432/ecommerce
-      - SECRET_KEY=${SECRET_KEY:-ecommerce-dev-secret-key}  # 统一JWT密钥
+      - SECRET_KEY=${SECRET_KEY:-ecommerce-dev-secret-key}
     depends_on:
       postgres:
         condition: service_healthy
@@ -51,9 +49,9 @@ services:
       - ecommerce-network
     volumes:
       - ./user_service:/app
+      - ./monitoring:/app/monitoring:ro
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
-  # 商品服务
   product-service:
     build: ./product_service
     container_name: product-service
@@ -68,9 +66,9 @@ services:
       - ecommerce-network
     volumes:
       - ./product_service:/app
+      - ./monitoring:/app/monitoring:ro
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
-  # 订单服务
   order-service:
     build: ./order_service
     container_name: order-service
@@ -82,15 +80,13 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      product-service:
-        condition: service_started
     networks:
       - ecommerce-network
     volumes:
       - ./order_service:/app
+      - ./monitoring:/app/monitoring:ro
     command: uvicorn main:app --host 0.0.0.0 --port 8080 --reload
 
-  # API网关
   api-gateway:
     build: ./api_gateway
     container_name: api-gateway
@@ -100,7 +96,7 @@ services:
       - USER_SERVICE_URL=http://user-service:8000
       - PRODUCT_SERVICE_URL=http://product-service:8000
       - ORDER_SERVICE_URL=http://order-service:8080
-      - SECRET_KEY=${SECRET_KEY:-ecommerce-dev-secret-key}  # 与用户服务相同
+      - SECRET_KEY=${SECRET_KEY:-ecommerce-dev-secret-key}
     depends_on:
       - user-service
       - product-service
@@ -109,9 +105,13 @@ services:
       - ecommerce-network
     volumes:
       - ./api_gateway:/app
+      - ./monitoring:/app/monitoring:ro
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
-  # Prometheus监控
+  # ==========================================
+  # 可观测性平台 (Observability Stack)
+  # ==========================================
+
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
@@ -119,14 +119,16 @@ services:
       - "9090:9090"
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/prometheus-alerts.yml:/etc/prometheus/alerts.yml
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
     networks:
       - ecommerce-network
 
-  # Grafana可视化
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
@@ -134,14 +136,25 @@ services:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=admin
     volumes:
       - grafana_data:/var/lib/grafana
       - ./monitoring/grafana-dashboards:/etc/grafana/provisioning/dashboards:ro
       - ./monitoring/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
     networks:
       - ecommerce-network
-    depends_on:
-      - prometheus
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - ecommerce-network
 
 networks:
   ecommerce-network:

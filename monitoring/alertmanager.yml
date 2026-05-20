@@ -1,0 +1,128 @@
+# ============================================
+# AlertManager 配置
+# 告警路由与通知配置
+# ============================================
+
+global:
+  # 默认告警超时时间
+  resolve_timeout: 5m
+  
+  # SMTP配置（用于邮件通知）
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'alerts@ecommerce.local'
+  smtp_auth_username: ''
+  smtp_auth_password: ''
+
+# 路由规则：决定告警如何分组和发送
+route:
+  # 根路由
+  receiver: 'default'
+  
+  # 按告警名称和严重性分组
+  group_by: ['alertname', 'severity']
+  
+  # 等待时间：相同组的告警会等待这个时间后一起发送
+  group_wait: 30s
+  
+  # 间隔：相同组的告警发送间隔
+  group_interval: 5m
+  
+  # 重复告警间隔
+  repeat_interval: 4h
+  
+  # 子路由规则
+  routes:
+    # 严重告警立即发送
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      group_wait: 0s
+      continue: true
+    
+    # SLO相关告警
+    - match:
+        slo: availability
+      receiver: 'slo-team'
+      group_by: ['slo', 'severity']
+      continue: true
+    
+    # 业务指标告警
+    - match:
+        team: business
+      receiver: 'business-team'
+      continue: true
+    
+    # 平台/基础设施告警
+    - match:
+        team: platform
+      receiver: 'platform-team'
+
+# 抑制规则：避免告警风暴
+inhibit_rules:
+  # 如果服务宕机，抑制该服务的其他告警
+  - source_match:
+      alertname: 'ServiceDown'
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['job']
+  
+  # 如果可用性严重告警触发，抑制可用性警告
+  - source_match:
+      alertname: 'AvailabilityBelowSLO'
+      severity: 'critical'
+    target_match:
+      alertname: 'AvailabilityDegrading'
+    equal: []
+
+# 接收器配置
+receivers:
+  # 默认接收器：日志记录
+  - name: 'default'
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook'
+        send_resolved: true
+
+  # 严重告警接收器
+  - name: 'critical-alerts'
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook/critical'
+        send_resolved: true
+    # 可以添加更多通知方式
+    # email_configs:
+    #   - to: 'oncall@ecommerce.local'
+    #     subject: '[CRITICAL] 电商平台告警'
+    #     body: |
+    #       {{ range .Alerts }}
+    #       告警: {{ .Annotations.summary }}
+    #       详情: {{ .Annotations.description }}
+    #       时间: {{ .StartsAt }}
+    #       {{ end }}
+
+  # SLO团队接收器
+  - name: 'slo-team'
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook/slo'
+        send_resolved: true
+
+  # 业务团队接收器
+  - name: 'business-team'
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook/business'
+        send_resolved: true
+
+  # 平台团队接收器
+  - name: 'platform-team'
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook/platform'
+        send_resolved: true
+
+  # 开发测试用的简单接收器（输出到文件）
+  - name: 'file-log'
+    webhook_configs:
+      - url: 'http://webhook-logger:8080/webhook'
+        send_resolved: true
+
+# 模板配置
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'

@@ -10,6 +10,16 @@ from typing import Dict, Optional
 # ==================== 关键：JWT导入和配置 ====================
 from jose import JWTError, jwt
 
+# ==================== OpenTelemetry 链路追踪 ====================
+import sys
+sys.path.append('/app/monitoring')
+try:
+    from tracing import init_tracing
+    TRACING_ENABLED = True
+except ImportError:
+    TRACING_ENABLED = False
+    print("Tracing not available")
+
 # ==================== 配置 ====================
 USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://user_service:8000")
 PRODUCT_SERVICE_URL = os.getenv("PRODUCT_SERVICE_URL", "http://product_service:8000")
@@ -56,6 +66,10 @@ MEMORY_PERCENT = Gauge('gateway_memory_usage_percent', 'Memory usage percentage'
 
 # ==================== FastAPI应用 ====================
 app = FastAPI(title="API网关", description="电商平台统一入口")
+
+# ==================== 初始化链路追踪 ====================
+if TRACING_ENABLED:
+    init_tracing("api-gateway", app=app)
 
 
 # ==================== 关键：JWT验证依赖 ====================

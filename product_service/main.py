@@ -24,6 +24,15 @@ except ImportError:
     # CI环境中使用相对导入
     from models import Product, get_db, init_db, SessionLocal
 
+# ==================== OpenTelemetry 链路追踪 ====================
+sys.path.append('/app/monitoring')
+try:
+    from tracing import init_tracing
+    TRACING_ENABLED = True
+except ImportError:
+    TRACING_ENABLED = False
+    print("Tracing not available")
+
 # ==================== Prometheus监控指标 ====================
 REQUEST_COUNT = Counter(
     'product_service_requests_total',
@@ -65,6 +74,10 @@ CPU_USAGE = Gauge(
 
 # ==================== FastAPI应用 ====================
 app = FastAPI(title="商品服务", description="电商平台商品管理服务")
+
+# ==================== 初始化链路追踪 ====================
+if TRACING_ENABLED:
+    init_tracing("product-service", app=app)
 
 
 # ==================== 中间件 ====================
